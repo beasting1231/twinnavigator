@@ -12,7 +12,7 @@ const menuItems = [
 const SideMenu = () => {
   return (
     <div className="p-6 h-full flex flex-col">
-      <div className="space-y-1">
+      <div className="space-y-1 mt-12">
         {menuItems.map((item) => (
           <Link
             key={item.label}
