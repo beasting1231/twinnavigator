@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from "@/components/ui/use-toast";
 import BookingModal, { BookingFormData } from './BookingModal';
+import EditBookingModal from './EditBookingModal';
 
 const TIMES = ["7:30", "8:30", "9:45", "11:00", "12:30", "14:00", "15:30", "16:45"];
 
@@ -60,6 +61,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     time: string;
     pilotId: string;
   } | null>(null);
+  const [selectedBooking, setSelectedBooking] = React.useState<Booking | null>(null);
   const formattedDate = format(selectedDate, "yyyy-MM-dd");
 
   useEffect(() => {
@@ -205,6 +207,63 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     }
   });
 
+  const updateBooking = useMutation({
+    mutationFn: async (data: BookingFormData & { id: string }) => {
+      const { error } = await supabase
+        .from('bookings')
+        .update({
+          name: data.name,
+          pickup_location: data.pickup_location,
+          number_of_people: data.number_of_people,
+          phone: data.phone,
+          email: data.email,
+          tag_id: data.tag_id
+        })
+        .eq('id', data.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Booking updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update booking: " + error.message,
+      });
+    }
+  });
+
+  const deleteBooking = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('bookings')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Booking deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete booking: " + error.message,
+      });
+    }
+  });
+
   const getDefaultTagId = async () => {
     const { data } = await supabase
       .from('tags')
@@ -243,6 +302,24 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     });
     
     setSelectedSlot(null);
+  };
+
+  const handleUpdateBooking = async (data: BookingFormData) => {
+    if (!selectedBooking) return;
+    
+    await updateBooking.mutate({
+      ...data,
+      id: selectedBooking.id
+    });
+    
+    setSelectedBooking(null);
+  };
+
+  const handleDeleteBooking = async () => {
+    if (!selectedBooking) return;
+    
+    await deleteBooking.mutate(selectedBooking.id);
+    setSelectedBooking(null);
   };
 
   const getTimeSlotData = (time: string): SlotType[] => {
@@ -342,13 +419,13 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
                   }`}>
                     {slot.type === 'booking' && (
                       <div 
-                        className="rounded-lg p-2 text-sm font-medium h-full relative"
+                        className="rounded-lg p-2 text-sm font-medium h-full relative cursor-pointer hover:opacity-90"
                         style={{ 
                           backgroundColor: slot.booking.tags?.color || '#1EAEDB',
-                          cursor: 'default',
                           gridColumn: `span ${slot.width}`,
                           width: `calc(${slot.width * 100}% + ${(slot.width - 1) * 1}rem)`
                         }}
+                        onClick={() => setSelectedBooking(slot.booking)}
                       >
                         <div className="absolute top-1 right-1 bg-gray-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
                           {slot.booking.number_of_people}
@@ -392,6 +469,17 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         timeSlot={selectedSlot?.time || ""}
         maxPeople={selectedSlot ? getAvailablePilotsCount(selectedSlot.time) : 1}
       />
+
+      {selectedBooking && (
+        <EditBookingModal
+          isOpen={!!selectedBooking}
+          onClose={() => setSelectedBooking(null)}
+          onSubmit={handleUpdateBooking}
+          onDelete={handleDeleteBooking}
+          booking={selectedBooking}
+          maxPeople={4}
+        />
+      )}
     </div>
   );
 };
