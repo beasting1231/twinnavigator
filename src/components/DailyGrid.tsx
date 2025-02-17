@@ -241,25 +241,38 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
   const deleteBooking = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      console.log('Attempting to delete booking with ID:', id);
+      
+      const { data, error } = await supabase
         .from('bookings')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .select();
 
       if (error) {
+        console.error('Supabase delete error:', error);
         throw error;
       }
+
+      console.log('Delete response:', data);
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Delete successful, deleted data:', data);
       toast({
         title: "Success",
         description: "Booking deleted successfully",
       });
+      
       queryClient.invalidateQueries({
         queryKey: ['bookings', formattedDate]
       });
+      queryClient.invalidateQueries({
+        queryKey: ['bookings']
+      });
     },
     onError: (error) => {
+      console.error('Delete mutation error:', error);
       toast({
         variant: "destructive",
         title: "Error",
