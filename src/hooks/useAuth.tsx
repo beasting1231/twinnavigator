@@ -1,3 +1,4 @@
+
 import { useEffect, useState, createContext, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User } from '@supabase/supabase-js';
@@ -103,16 +104,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (email: string, password: string) => {
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signUp({
+      // Sign up the user
+      const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
       });
-      if (error) throw error;
-      
-      toast({
-        title: "Account created",
-        description: "Please check your email to verify your account",
+      if (signUpError) throw signUpError;
+
+      // Immediately sign in the user
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
+      if (signInError) throw signInError;
+
+      toast({
+        title: "Welcome!",
+        description: "Your account has been created successfully.",
+      });
+
+      navigate('/onboarding');
     } catch (error: any) {
       toast({
         variant: "destructive",
