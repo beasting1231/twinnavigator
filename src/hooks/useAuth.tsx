@@ -13,7 +13,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-  updateProfile: (data: Partial<Profile>) => Promise<void>;
+  updateProfile: (profile: Partial<Profile>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,11 +22,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  async function fetchProfile(userId: string) {
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        await fetchProfile(session.user.id);
+      } else {
+        setProfile(null);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const fetchProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -38,46 +66,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(data);
     } catch (error) {
       console.error('Error fetching profile:', error);
+    } finally {
+      setLoading(false);
     }
-  }
-
-  useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        }
-      } catch (error) {
-        console.error('Error checking initial session:', error);
-      } finally {
-        setLoading(false);
-        setInitialLoadComplete(true);
-      }
-    };
-
-    initializeAuth();
-  }, []);
-
-  useEffect(() => {
-    if (!initialLoadComplete) return;
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        } else {
-          setProfile(null);
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, [initialLoadComplete]);
+  };
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -104,14 +96,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (email: string, password: string) => {
     try {
       setLoading(true);
-      // Sign up the user
       const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
       });
       if (signUpError) throw signUpError;
 
-      // Immediately sign in the user
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -141,10 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(true);
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      
-      setUser(null);
-      setProfile(null);
-      navigate('/auth', { replace: true });
+      navigate('/auth');
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -156,23 +143,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateProfile = async (data: Partial<Profile>) => {
+  const updateProfile = async (profileData: Partial<Profile>) => {
     try {
-      if (!user?.id) throw new Error('No user');
+      setLoading(true);
+      if (!user?.id) throw new Error('No user ID');
 
       const { error } = await supabase
         .from('profiles')
-        .update(data)
-        .eq('id', user.id);
+        .upsert({ id: user.id, ...profileData });
 
       if (error) throw error;
 
-      setProfile(prev => prev ? { ...prev, ...data } : null);
-      
-      toast({
-        title: "Profile updated",
-        description: "Your profile has been updated successfully",
-      });
+      // Refresh profile data
+      await fetchProfile(user.id);
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -180,6 +163,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: error.message,
       });
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
