@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
+import { useNavigate } from "react-router-dom";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -13,6 +14,7 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const { signIn, signUp } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,11 +23,25 @@ const Auth = () => {
     try {
       if (isLogin) {
         await signIn(email, password);
+        toast({
+          title: "Welcome back!",
+          description: "You've successfully logged in.",
+        });
+        navigate("/");
       } else {
         await signUp(email, password);
+        toast({
+          title: "Account created",
+          description: "Please check your email to verify your account",
+        });
       }
     } catch (error: any) {
       console.error("Authentication error:", error);
+      toast({
+        variant: "destructive",
+        title: "Authentication error",
+        description: error.message || "An error occurred during authentication",
+      });
     } finally {
       setLoading(false);
     }

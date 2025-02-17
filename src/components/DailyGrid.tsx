@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { format } from "date-fns";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -114,15 +115,14 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     };
   }, [formattedDate, queryClient]);
 
-  const { data: availabilitiesData, isLoading: availabilitiesLoading, error: availabilitiesError } = useQuery({
+  const { data: availabilitiesData } = useQuery({
     queryKey: ['daily-plan', formattedDate],
     queryFn: async () => {
-      console.log('Fetching availabilities for date:', formattedDate);
       if (!user) {
         throw new Error('Not authenticated');
       }
 
-      const { data, error } = await supabase
+      const { data: availabilities, error } = await supabase
         .from('pilot_availability')
         .select(`
           id,
@@ -141,8 +141,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         throw error;
       }
 
-      console.log('Fetched availabilities:', data);
-      return data?.map(avail => ({
+      return availabilities?.map(avail => ({
         ...avail,
         profiles: avail.profiles || { username: 'Unknown Pilot', id: avail.pilot_id }
       })) as PilotAvailability[];
@@ -150,10 +149,9 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     enabled: !!user
   });
 
-  const { data: bookingsData, isLoading: bookingsLoading, error: bookingsError } = useQuery({
+  const { data: bookingsData } = useQuery({
     queryKey: ['bookings', formattedDate],
     queryFn: async () => {
-      console.log('Fetching bookings for date:', formattedDate);
       const { data, error } = await supabase
         .from('bookings')
         .select(`
@@ -170,17 +168,11 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
           )
         `)
         .eq('booking_date', formattedDate)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: true });  // Add ordering by creation time
 
-      if (error) {
-        console.error('Error fetching bookings:', error);
-        throw error;
-      }
-
-      console.log('Fetched bookings:', data);
+      if (error) throw error;
       return data as Booking[];
-    },
-    enabled: !!user
+    }
   });
 
   const createBooking = useMutation({
@@ -233,9 +225,11 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
       if (error) throw error;
 
+      // Return the updated data
       return data;
     },
     onSuccess: (updatedData) => {
+      // Update the cache manually to preserve order
       queryClient.setQueryData(['bookings', formattedDate], (oldData: Booking[] | undefined) => {
         if (!oldData) return [];
         return oldData.map(booking => 
@@ -331,24 +325,6 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     return null;
   }
 
-  if (availabilitiesError || bookingsError) {
-    console.error('Data fetching error:', { availabilitiesError, bookingsError });
-    toast({
-      variant: "destructive",
-      title: "Error loading data",
-      description: "There was a problem loading the schedule. Please try again.",
-    });
-    return null;
-  }
-
-  if (availabilitiesLoading || bookingsLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-      </div>
-    );
-  }
-
   const availablePilots = Array.from(new Set(
     (availabilitiesData || [])
       .map(a => ({
@@ -365,6 +341,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
   const getTimeSlotData = (time: string): SlotType[] => {
     const timeBookings = bookingsData?.filter(b => b.time_slot === time) || [];
     
+    // Create initial slots array
     let slots: SlotType[] = availablePilots.map(pilot => {
       const isAvailable = availabilitiesData?.some(
         (a: PilotAvailability) => 
@@ -377,16 +354,19 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         : { type: 'unavailable' as const, pilot };
     });
 
+    // Sort slots to put available slots first
     slots.sort((a, b) => {
       if (a.type === 'available' && b.type === 'unavailable') return -1;
       if (a.type === 'unavailable' && b.type === 'available') return 1;
       return 0;
     });
 
+    // Fill remaining slots if needed
     while (slots.length < 4) {
       slots.push({ type: 'empty' });
     }
 
+    // Process bookings in order
     timeBookings.forEach(booking => {
       const width = Math.min(booking.number_of_people, 4);
       const availableIndex = slots.findIndex((slot, index) => {
