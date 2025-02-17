@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { format } from "date-fns";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -18,7 +19,7 @@ interface PilotAvailability {
   profiles: {
     username: string | null;
     id: string;
-  } | null;
+  };
 }
 
 const DailyGrid = ({ selectedDate }: DailyGridProps) => {
@@ -62,22 +63,34 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
   const { data: availabilitiesData } = useQuery({
     queryKey: ['daily-plan', formattedDate],
     queryFn: async () => {
-      const { data: availabilities, error: availabilityError } = await supabase
+      // First, get all pilot availabilities with their profiles for the selected date
+      const { data: availabilities, error } = await supabase
         .from('pilot_availability')
         .select(`
           id,
           pilot_id,
           day,
           time_slot,
-          profiles (
+          profiles!pilot_availability_pilot_id_fkey (
             username,
             id
           )
         `)
         .eq('day', formattedDate);
 
-      if (availabilityError) throw availabilityError;
-      return availabilities as PilotAvailability[];
+      if (error) {
+        console.error('Error fetching availabilities:', error);
+        throw error;
+      }
+
+      // If we have no data, return an empty array
+      if (!availabilities) return [];
+
+      // Ensure each availability has the profile data properly structured
+      return availabilities.map(avail => ({
+        ...avail,
+        profiles: avail.profiles || { username: 'Unknown Pilot', id: avail.pilot_id }
+      })) as PilotAvailability[];
     }
   });
 
@@ -86,7 +99,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     (availabilitiesData || [])
       .map(a => ({
         id: a.pilot_id,
-        name: a.profiles?.username || 'Unknown Pilot'
+        name: a.profiles.username || 'Unknown Pilot'
       }))
       .filter((pilot, index, self) => 
         index === self.findIndex(p => p.id === pilot.id)
