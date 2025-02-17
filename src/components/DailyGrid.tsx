@@ -50,12 +50,13 @@ type SlotBaseType = {
   pilot?: Pilot;
 };
 
-type SlotType = 
-  | (SlotBaseType & { type: 'empty' })
-  | (SlotBaseType & { type: 'available'; pilot: Pilot })
-  | (SlotBaseType & { type: 'unavailable'; pilot: Pilot })
-  | (SlotBaseType & { type: 'booking'; pilot: Pilot; booking: Booking; width: number })
-  | (SlotBaseType & { type: 'hidden'; pilot: Pilot });
+type AvailableSlot = SlotBaseType & { type: 'available'; pilot: Pilot };
+type UnavailableSlot = SlotBaseType & { type: 'unavailable'; pilot: Pilot };
+type EmptySlot = SlotBaseType & { type: 'empty' };
+type BookingSlot = SlotBaseType & { type: 'booking'; pilot: Pilot; booking: Booking; width: number };
+type HiddenSlot = SlotBaseType & { type: 'hidden'; pilot: Pilot };
+
+type SlotType = AvailableSlot | UnavailableSlot | EmptySlot | BookingSlot | HiddenSlot;
 
 const DailyGrid = ({ selectedDate }: DailyGridProps) => {
   const { user } = useAuth();
@@ -344,8 +345,8 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     const timeBookings = bookingsData?.filter(b => b.time_slot === time) || [];
     const maxSlots = 4;
     
-    // Get available pilots for this time slot
-    let availableSlots = availablePilots.map(pilot => {
+    // Get pilot availability slots
+    const pilotSlots: (AvailableSlot | UnavailableSlot)[] = availablePilots.map(pilot => {
       const isAvailable = availabilitiesData?.some(
         (a: PilotAvailability) => 
           a.pilot_id === pilot.id && 
@@ -357,16 +358,17 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         : { type: 'unavailable' as const, pilot };
     });
 
-    // Sort to put available slots first
-    availableSlots.sort((a, b) => {
+    // Sort available slots first
+    pilotSlots.sort((a, b) => {
       if (a.type === 'available' && b.type === 'unavailable') return -1;
       if (a.type === 'unavailable' && b.type === 'available') return 1;
       return 0;
     });
 
-    // Fill to ensure we have exactly 4 slots
+    // Create initial slots array with empty slots if needed
+    let availableSlots: SlotType[] = [...pilotSlots];
     while (availableSlots.length < maxSlots) {
-      availableSlots.push({ type: 'empty' } as SlotType);
+      availableSlots.push({ type: 'empty' });
     }
     availableSlots = availableSlots.slice(0, maxSlots);
 
@@ -382,22 +384,24 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
       const availableIndex = finalSlots.findIndex(slot => slot.type === 'available');
       if (availableIndex === -1) continue;
 
-      // Create booking slot
-      const pilot = finalSlots[availableIndex].type === 'available' 
-        ? finalSlots[availableIndex].pilot 
-        : { id: booking.pilot_id, name: 'Unknown Pilot' };
+      // Get the pilot from the available slot
+      const availableSlot = finalSlots[availableIndex] as AvailableSlot;
+      const pilot = availableSlot.pilot;
 
-      finalSlots[availableIndex] = {
+      // Create booking slot
+      const bookingSlot: BookingSlot = {
         type: 'booking',
         pilot,
         booking,
         width
       };
+      finalSlots[availableIndex] = bookingSlot;
 
       // Hide subsequent slots
       for (let i = 1; i < width; i++) {
         if (availableIndex + i < maxSlots) {
-          finalSlots[availableIndex + i] = { type: 'hidden', pilot };
+          const hiddenSlot: HiddenSlot = { type: 'hidden', pilot };
+          finalSlots[availableIndex + i] = hiddenSlot;
         }
       }
 
