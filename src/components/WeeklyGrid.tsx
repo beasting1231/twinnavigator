@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { format, addDays, startOfWeek } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
@@ -51,7 +52,7 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
     },
   });
 
-  // Create availability mutation
+  // Create availability mutation with optimistic updates
   const createAvailability = useMutation({
     mutationFn: async ({ day, timeSlot }: { day: string; timeSlot: string }) => {
       const { error } = await supabase
@@ -66,24 +67,42 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
 
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pilot-availability'] });
-      toast({
-        title: "Availability updated",
-        description: "Your availability has been saved.",
+    onMutate: async ({ day, timeSlot }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['pilot-availability'] });
+
+      // Snapshot the previous value
+      const previousAvailabilities = queryClient.getQueryData(['pilot-availability']);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData(['pilot-availability'], (old: Availability[] = []) => {
+        const newAvailability = {
+          id: `temp-${Date.now()}`,
+          pilot_id: user?.id!,
+          day,
+          time_slot: timeSlot,
+        };
+        return [...old, newAvailability];
       });
+
+      return { previousAvailabilities };
     },
-    onError: (error) => {
+    onError: (err, variables, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      queryClient.setQueryData(['pilot-availability'], context?.previousAvailabilities);
       toast({
         variant: "destructive",
         title: "Error",
         description: "Failed to update availability. Please try again.",
       });
-      console.error('Error creating availability:', error);
+    },
+    onSettled: () => {
+      // Always refetch after error or success to make sure our optimistic update matches the server state
+      queryClient.invalidateQueries({ queryKey: ['pilot-availability'] });
     },
   });
 
-  // Delete availability mutation
+  // Delete availability mutation with optimistic updates
   const deleteAvailability = useMutation({
     mutationFn: async ({ day, timeSlot }: { day: string; timeSlot: string }) => {
       const { error } = await supabase
@@ -97,20 +116,26 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
 
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pilot-availability'] });
-      toast({
-        title: "Availability updated",
-        description: "Your availability has been removed.",
+    onMutate: async ({ day, timeSlot }) => {
+      await queryClient.cancelQueries({ queryKey: ['pilot-availability'] });
+      const previousAvailabilities = queryClient.getQueryData(['pilot-availability']);
+
+      queryClient.setQueryData(['pilot-availability'], (old: Availability[] = []) => {
+        return old.filter(a => !(a.day === day && a.time_slot === timeSlot && a.pilot_id === user?.id));
       });
+
+      return { previousAvailabilities };
     },
-    onError: (error) => {
+    onError: (err, variables, context) => {
+      queryClient.setQueryData(['pilot-availability'], context?.previousAvailabilities);
       toast({
         variant: "destructive",
         title: "Error",
         description: "Failed to update availability. Please try again.",
       });
-      console.error('Error deleting availability:', error);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['pilot-availability'] });
     },
   });
 
@@ -131,22 +156,17 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
       (a) => a.day === day && a.pilot_id === user?.id
     );
 
-    // If all time slots are available, make them all unavailable
-    // Otherwise, make all unavailable slots available
     const shouldMakeAvailable = dayAvailabilities.length < TIMES.length;
 
     if (shouldMakeAvailable) {
-      // Find time slots that aren't already available
       const unavailableTimeSlots = TIMES.filter(
         time => !dayAvailabilities.some(a => a.time_slot === time)
       );
       
-      // Make all unavailable slots available
       unavailableTimeSlots.forEach(timeSlot => {
         createAvailability.mutate({ day, timeSlot });
       });
     } else {
-      // Make all slots unavailable
       dayAvailabilities.forEach(availability => {
         deleteAvailability.mutate({ 
           day: availability.day, 
@@ -208,8 +228,8 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
                         </div>
                       )}
                       {!isAvailable && isPilot && (
-                        <div className="border-2 border-dashed border-gray-200 rounded-lg p-2 text-sm font-medium text-center text-gray-400 cursor-pointer hover:border-gray-300 hover:text-gray-500">
-                          Set Available
+                        <div className="bg-red-500/10 text-red-700 rounded-lg p-2 text-sm font-medium text-center cursor-pointer hover:bg-red-500/20">
+                          Unavailable
                         </div>
                       )}
                     </div>
