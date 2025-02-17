@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { format } from "date-fns";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -32,7 +31,7 @@ interface Booking {
   pickup_location: string;
   number_of_people: number;
   pilot_id: string;
-  time_slot: string;  // Added this field
+  time_slot: string;
   tag_id: string | null;
   tags?: {
     color: string;
@@ -51,14 +50,12 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
   } | null>(null);
   const formattedDate = format(selectedDate, "yyyy-MM-dd");
 
-  // Redirect to auth if not authenticated
   useEffect(() => {
     if (!user) {
       navigate('/auth');
     }
   }, [user, navigate]);
   
-  // Set up real-time subscription
   useEffect(() => {
     let channel: RealtimeChannel;
 
@@ -103,7 +100,6 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     };
   }, [formattedDate, queryClient]);
 
-  // Fetch availabilities and profiles
   const { data: availabilitiesData } = useQuery({
     queryKey: ['daily-plan', formattedDate],
     queryFn: async () => {
@@ -138,7 +134,6 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     enabled: !!user
   });
 
-  // Fetch bookings
   const { data: bookingsData } = useQuery({
     queryKey: ['bookings', formattedDate],
     queryFn: async () => {
@@ -212,7 +207,6 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     return null;
   }
 
-  // Get unique pilots that have at least one availability slot
   const availablePilots = Array.from(new Set(
     (availabilitiesData || [])
       .map(a => ({
@@ -240,15 +234,16 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
   };
 
   const getTimeSlotData = (time: string) => {
-    const slots = availablePilots.map(pilot => {
+    const timeBookings = bookingsData?.filter(b => b.time_slot === time) || [];
+    
+    let slots = new Array(4).fill(null).map((_, index) => {
+      const pilot = availablePilots[index];
+      if (!pilot) return { type: 'empty' };
+      
       const isAvailable = availabilitiesData?.some(
         (a: PilotAvailability) => 
           a.pilot_id === pilot.id && 
           a.time_slot === time
-      );
-      
-      const booking = bookingsData?.find(
-        b => b.pilot_id === pilot.id && b.time_slot === time
       );
 
       const hasAnyAvailability = availabilitiesData?.some(
@@ -256,20 +251,42 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
       );
 
       return {
+        type: isAvailable ? 'available' : (hasAnyAvailability ? 'unavailable' : 'empty'),
         pilot,
-        isAvailable,
-        hasAnyAvailability,
-        booking
       };
     });
 
-    // Sort slots to put bookings first, then available slots
-    return slots.sort((a, b) => {
-      if (a.booking && !b.booking) return -1;
-      if (!a.booking && b.booking) return 1;
-      if (a.isAvailable === b.isAvailable) return 0;
-      return a.isAvailable ? -1 : 1;
+    timeBookings.forEach(booking => {
+      const width = Math.min(booking.number_of_people, 4);
+      const availableIndex = slots.findIndex((slot, index) => {
+        for (let i = 0; i < width; i++) {
+          if (!slots[index + i] || slots[index + i].type !== 'available') {
+            return false;
+          }
+        }
+        return true;
+      });
+
+      if (availableIndex !== -1) {
+        for (let i = 0; i < width; i++) {
+          if (i === 0) {
+            slots[availableIndex] = {
+              type: 'booking',
+              booking,
+              width,
+              pilot: slots[availableIndex].pilot,
+            };
+          } else {
+            slots[availableIndex + i] = {
+              type: 'hidden',
+              pilot: slots[availableIndex + i].pilot,
+            };
+          }
+        }
+      }
     });
+
+    return slots;
   };
 
   const getAvailablePilotsCount = (time: string) => {
@@ -280,12 +297,10 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     <div className="mt-8 overflow-x-auto pb-4">
       <div className="min-w-[1000px]">
         <div className="grid grid-cols-[120px_1fr] gap-4">
-          {/* Time column header */}
           <div className="font-semibold mb-2">
             Time
           </div>
           
-          {/* Pilots header */}
           <div className="grid grid-cols-4 gap-4">
             {availablePilots.map((pilot) => (
               <div 
@@ -297,46 +312,49 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
             ))}
           </div>
 
-          {/* Time slots */}
           {TIMES.map((time) => (
             <React.Fragment key={time}>
-              {/* Time label */}
               <div className="py-2 font-medium text-muted-foreground">
                 {time}
               </div>
 
-              {/* Available slots for each pilot */}
               <div className="grid grid-cols-4 gap-4">
-                {getTimeSlotData(time).map(({ pilot, isAvailable, hasAnyAvailability, booking }) => (
-                  <div key={`${pilot.id}-${time}`} className="h-[50px] relative">
-                    {booking ? (
+                {getTimeSlotData(time).map((slot, index) => (
+                  <div key={index} className={`h-[50px] relative ${
+                    slot.type === 'hidden' ? 'hidden' : ''
+                  }`}>
+                    {slot.type === 'booking' && (
                       <div 
-                        className="rounded-lg p-2 text-sm font-medium h-full w-full relative"
+                        className="rounded-lg p-2 text-sm font-medium h-full relative"
                         style={{ 
-                          backgroundColor: booking.tags?.color || '#1EAEDB',
-                          cursor: 'default'
+                          backgroundColor: slot.booking.tags?.color || '#1EAEDB',
+                          cursor: 'default',
+                          gridColumn: `span ${slot.width}`,
+                          width: `calc(${slot.width * 100}% + ${(slot.width - 1) * 1}rem)`
                         }}
                       >
                         <div className="absolute top-1 right-1 bg-gray-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
-                          {booking.number_of_people}
+                          {slot.booking.number_of_people}
                         </div>
                         <div className="flex flex-col text-white text-xs">
-                          <span className="font-medium">{booking.name}</span>
-                          <span>{booking.pickup_location}</span>
+                          <span className="font-medium">{slot.booking.name}</span>
+                          <span>{slot.booking.pickup_location}</span>
                         </div>
                       </div>
-                    ) : isAvailable ? (
+                    )}
+                    {slot.type === 'available' && (
                       <div 
                         className="bg-white rounded-lg p-2 text-sm font-medium text-center h-full w-full cursor-pointer hover:bg-gray-50"
-                        onClick={() => setSelectedSlot({ time, pilotId: pilot.id })}
+                        onClick={() => setSelectedSlot({ time, pilotId: slot.pilot.id })}
                       >
                         Available
                       </div>
-                    ) : hasAnyAvailability ? (
+                    )}
+                    {slot.type === 'unavailable' && (
                       <div className="bg-gray-700 rounded-lg p-2 text-sm font-medium text-center text-white h-full w-full">
-                        No {pilot.name}
+                        No {slot.pilot.name}
                       </div>
-                    ) : null}
+                    )}
                   </div>
                 ))}
               </div>
