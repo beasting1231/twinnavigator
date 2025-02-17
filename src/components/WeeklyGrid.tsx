@@ -29,8 +29,8 @@ const WeeklyGrid = () => {
   };
 
   return (
-    <ScrollArea className="w-full mt-6">
-      <div className="min-w-[800px] pr-4">
+    <ScrollArea className="w-full mt-6" style={{ overflow: 'auto' }}>
+      <div className="min-w-[1000px]">
         <div className="grid grid-cols-7 gap-4">
           {/* Day headers */}
           {DAYS.map((day) => (
