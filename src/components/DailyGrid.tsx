@@ -39,6 +39,18 @@ interface Booking {
   } | null;
 }
 
+interface Pilot {
+  id: string;
+  name: string;
+}
+
+type SlotType = 
+  | { type: 'empty' }
+  | { type: 'available'; pilot: Pilot }
+  | { type: 'unavailable'; pilot: Pilot }
+  | { type: 'booking'; pilot: Pilot; booking: Booking; width: number }
+  | { type: 'hidden'; pilot: Pilot };
+
 const DailyGrid = ({ selectedDate }: DailyGridProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -233,10 +245,10 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     setSelectedSlot(null);
   };
 
-  const getTimeSlotData = (time: string) => {
+  const getTimeSlotData = (time: string): SlotType[] => {
     const timeBookings = bookingsData?.filter(b => b.time_slot === time) || [];
     
-    let slots = new Array(4).fill(null).map((_, index) => {
+    let slots: SlotType[] = new Array(4).fill(null).map((_, index) => {
       const pilot = availablePilots[index];
       if (!pilot) return { type: 'empty' };
       
@@ -250,17 +262,18 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         (a: PilotAvailability) => a.pilot_id === pilot.id
       );
 
-      return {
-        type: isAvailable ? 'available' : (hasAnyAvailability ? 'unavailable' : 'empty'),
-        pilot,
-      };
+      return isAvailable 
+        ? { type: 'available' as const, pilot }
+        : { type: 'unavailable' as const, pilot };
     });
 
     timeBookings.forEach(booking => {
       const width = Math.min(booking.number_of_people, 4);
       const availableIndex = slots.findIndex((slot, index) => {
+        if (slot.type !== 'available') return false;
         for (let i = 0; i < width; i++) {
-          if (!slots[index + i] || slots[index + i].type !== 'available') {
+          const nextSlot = slots[index + i];
+          if (!nextSlot || nextSlot.type !== 'available') {
             return false;
           }
         }
@@ -268,19 +281,23 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
       });
 
       if (availableIndex !== -1) {
-        for (let i = 0; i < width; i++) {
-          if (i === 0) {
-            slots[availableIndex] = {
-              type: 'booking',
-              booking,
-              width,
-              pilot: slots[availableIndex].pilot,
-            };
-          } else {
-            slots[availableIndex + i] = {
-              type: 'hidden',
-              pilot: slots[availableIndex + i].pilot,
-            };
+        const firstSlot = slots[availableIndex];
+        if (firstSlot.type === 'available') {
+          slots[availableIndex] = {
+            type: 'booking',
+            pilot: firstSlot.pilot,
+            booking,
+            width
+          };
+          
+          for (let i = 1; i < width; i++) {
+            const subsequentSlot = slots[availableIndex + i];
+            if (subsequentSlot.type === 'available') {
+              slots[availableIndex + i] = {
+                type: 'hidden',
+                pilot: subsequentSlot.pilot
+              };
+            }
           }
         }
       }
