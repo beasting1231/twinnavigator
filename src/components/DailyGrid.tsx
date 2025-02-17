@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { format } from "date-fns";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -166,7 +167,8 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
             name
           )
         `)
-        .eq('booking_date', formattedDate);
+        .eq('booking_date', formattedDate)
+        .order('created_at', { ascending: true });  // Add ordering by creation time
 
       if (error) throw error;
       return data as Booking[];
@@ -222,13 +224,27 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         .eq('id', data.id);
 
       if (error) throw error;
+
+      // Return the updated data
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (updatedData) => {
+      // Update the cache manually to preserve order
+      queryClient.setQueryData(['bookings', formattedDate], (oldData: Booking[] | undefined) => {
+        if (!oldData) return [];
+        return oldData.map(booking => 
+          booking.id === updatedData.id 
+            ? { ...booking, ...updatedData }
+            : booking
+        );
+      });
+
       toast({
         title: "Success",
         description: "Booking updated successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ['bookings', formattedDate] });
+      
+      setSelectedBooking(null);
     },
     onError: (error) => {
       toast({
@@ -335,15 +351,12 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
           a.time_slot === time
       );
 
-      const hasAnyAvailability = availabilitiesData?.some(
-        (a: PilotAvailability) => a.pilot_id === pilot.id
-      );
-
       return isAvailable 
         ? { type: 'available' as const, pilot }
         : { type: 'unavailable' as const, pilot };
     });
 
+    // Process bookings in order
     timeBookings.forEach(booking => {
       const width = Math.min(booking.number_of_people, 4);
       const availableIndex = slots.findIndex((slot, index) => {
