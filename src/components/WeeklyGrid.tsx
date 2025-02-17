@@ -1,12 +1,25 @@
 
 import { useState } from "react";
 import TimeBlock from "./TimeBlock";
+import { format, addDays, startOfWeek } from "date-fns";
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const TIMES = ["7:30", "8:30", "9:45", "11:00", "12:30", "14:00", "15:30", "16:45"];
 
 const WeeklyGrid = () => {
   const [availability, setAvailability] = useState<{ [key: string]: boolean }>({});
+
+  // Get the start of the current week (Monday)
+  const startDate = startOfWeek(new Date(), { weekStartsOn: 1 });
+  
+  // Generate array of 7 days starting from Monday
+  const DAYS = Array.from({ length: 7 }, (_, index) => {
+    const date = addDays(startDate, index);
+    return {
+      fullName: format(date, "EEEE"),
+      displayDate: format(date, "EEE MMM d").toUpperCase(),
+      date: date
+    };
+  });
 
   const toggleAvailability = (dayTime: string) => {
     setAvailability(prev => ({
@@ -34,19 +47,19 @@ const WeeklyGrid = () => {
           {/* Day headers */}
           {DAYS.map((day) => (
             <div 
-              key={day} 
+              key={day.fullName} 
               className="text-center font-semibold mb-2 cursor-pointer hover:text-primary transition-colors"
-              onClick={() => toggleEntireDay(day)}
+              onClick={() => toggleEntireDay(day.fullName)}
             >
-              {day}
+              <div>{day.displayDate}</div>
             </div>
           ))}
           
           {/* Time blocks */}
           {DAYS.map((day) => (
-            <div key={day} className="space-y-2">
+            <div key={day.fullName} className="space-y-2">
               {TIMES.map((time) => {
-                const key = `${day}-${time}`;
+                const key = `${day.fullName}-${time}`;
                 return (
                   <TimeBlock 
                     key={key}
