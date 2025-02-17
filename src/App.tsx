@@ -1,73 +1,66 @@
 
-import React from 'react';
-import { BrowserRouter as Router } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AuthProvider } from "@/hooks/useAuth";
 import { Toaster } from "@/components/ui/toaster";
-import TopBar from "@/components/TopBar";
-import { Routes, Route } from "react-router-dom";
-import DailyPlan from "@/pages/DailyPlan";
-import Availability from "@/pages/Availability";
-import Auth from "@/pages/Auth";
-import Onboarding from "@/pages/Onboarding";
-import NotFound from "@/pages/NotFound";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "./hooks/useAuth";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import DailyPlan from "./pages/DailyPlan";
+import Availability from "./pages/Availability";
+import NotFound from "./pages/NotFound";
+import Auth from "./pages/Auth";
+import Onboarding from "./pages/Onboarding";
 
-// Initialize QueryClient outside of component to avoid re-initialization
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+const queryClient = new QueryClient();
 
-function App() {
-  return (
-    <React.StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <Router>
-          <AuthProvider>
-            <div className="min-h-screen">
-              <TopBar />
-              <main className="flex-1 p-8">
-                <Routes>
-                  <Route 
-                    path="/" 
-                    element={
-                      <ProtectedRoute>
-                        <DailyPlan />
-                      </ProtectedRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/availability" 
-                    element={
-                      <ProtectedRoute>
-                        <Availability />
-                      </ProtectedRoute>
-                    } 
-                  />
-                  <Route path="/auth" element={<Auth />} />
-                  <Route 
-                    path="/onboarding" 
-                    element={
-                      <ProtectedRoute>
-                        <Onboarding />
-                      </ProtectedRoute>
-                    } 
-                  />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </main>
-              <Toaster />
-            </div>
-          </AuthProvider>
-        </Router>
-      </QueryClientProvider>
-    </React.StrictMode>
-  );
-}
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <BrowserRouter>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Navigate to="/daily-plan" replace />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/onboarding"
+              element={
+                <ProtectedRoute>
+                  <Onboarding />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/daily-plan"
+              element={
+                <ProtectedRoute>
+                  <DailyPlan />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/availability"
+              element={
+                <ProtectedRoute>
+                  <Availability />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </TooltipProvider>
+      </AuthProvider>
+    </BrowserRouter>
+  </QueryClientProvider>
+);
 
 export default App;

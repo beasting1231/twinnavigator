@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { format } from "date-fns";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -32,7 +33,6 @@ interface Booking {
   number_of_people: number;
   pilot_id: string;
   tag_id: string | null;
-  time_slot: string;
   tags?: {
     color: string;
     name: string;
@@ -50,12 +50,14 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
   } | null>(null);
   const formattedDate = format(selectedDate, "yyyy-MM-dd");
 
+  // Redirect to auth if not authenticated
   useEffect(() => {
     if (!user) {
       navigate('/auth');
     }
   }, [user, navigate]);
   
+  // Set up real-time subscription
   useEffect(() => {
     let channel: RealtimeChannel;
 
@@ -100,6 +102,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     };
   }, [formattedDate, queryClient]);
 
+  // Fetch availabilities and profiles
   const { data: availabilitiesData } = useQuery({
     queryKey: ['daily-plan', formattedDate],
     queryFn: async () => {
@@ -134,6 +137,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     enabled: !!user
   });
 
+  // Fetch bookings
   const { data: bookingsData } = useQuery({
     queryKey: ['bookings', formattedDate],
     queryFn: async () => {
@@ -207,6 +211,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     return null;
   }
 
+  // Get unique pilots that have at least one availability slot
   const availablePilots = Array.from(new Set(
     (availabilitiesData || [])
       .map(a => ({
@@ -257,6 +262,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
       };
     });
 
+    // Sort slots to put available ones first
     return slots.sort((a, b) => {
       if (a.isAvailable === b.isAvailable) return 0;
       return a.isAvailable ? -1 : 1;
@@ -271,10 +277,12 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     <div className="mt-8 overflow-x-auto pb-4">
       <div className="min-w-[1000px]">
         <div className="grid grid-cols-[120px_1fr] gap-4">
+          {/* Time column header */}
           <div className="font-semibold mb-2">
             Time
           </div>
           
+          {/* Pilots header */}
           <div className="grid grid-cols-4 gap-4">
             {availablePilots.map((pilot) => (
               <div 
@@ -286,12 +294,15 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
             ))}
           </div>
 
+          {/* Time slots */}
           {TIMES.map((time) => (
             <React.Fragment key={time}>
+              {/* Time label */}
               <div className="py-2 font-medium text-muted-foreground">
                 {time}
               </div>
 
+              {/* Available slots for each pilot */}
               <div className="grid grid-cols-4 gap-4">
                 {getTimeSlotData(time).map(({ pilot, isAvailable, hasAnyAvailability, booking }) => (
                   <div key={`${pilot.id}-${time}`} className="h-[50px]">
