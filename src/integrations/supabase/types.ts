@@ -15,27 +15,27 @@ export type Database = {
           gender: string | null
           id: string
           is_onboarded: boolean | null
-          role: Database["public"]["Enums"]["user_role"]
+          role: Database["public"]["Enums"]["user_role"] | null
           updated_at: string
-          username: string
+          username: string | null
         }
         Insert: {
           created_at?: string
           gender?: string | null
           id: string
           is_onboarded?: boolean | null
-          role: Database["public"]["Enums"]["user_role"]
+          role?: Database["public"]["Enums"]["user_role"] | null
           updated_at?: string
-          username: string
+          username?: string | null
         }
         Update: {
           created_at?: string
           gender?: string | null
           id?: string
           is_onboarded?: boolean | null
-          role?: Database["public"]["Enums"]["user_role"]
+          role?: Database["public"]["Enums"]["user_role"] | null
           updated_at?: string
-          username?: string
+          username?: string | null
         }
         Relationships: []
       }
