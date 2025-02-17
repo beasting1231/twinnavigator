@@ -25,35 +25,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchProfile(session.user.id);
-      } else {
-        setProfile(null);
-        setLoading(false);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
   const fetchProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -66,10 +37,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(data);
     } catch (error) {
       console.error('Error fetching profile:', error);
-    } finally {
-      setLoading(false);
+      // Don't set loading to false here, let the caller handle it
     }
   };
+
+  useEffect(() => {
+    let mounted = true;
+
+    const initializeAuth = async () => {
+      try {
+        // Get initial session
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (mounted) {
+          setUser(session?.user ?? null);
+          if (session?.user) {
+            await fetchProfile(session.user.id);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking initial session:', error);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    initializeAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (mounted) {
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          await fetchProfile(session.user.id);
+        } else {
+          setProfile(null);
+        }
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -87,9 +101,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         title: "Error signing in",
         description: error.message,
       });
-      throw error;
-    } finally {
       setLoading(false);
+      throw error;
     }
   };
 
@@ -120,9 +133,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         title: "Error signing up",
         description: error.message,
       });
-      throw error;
-    } finally {
       setLoading(false);
+      throw error;
     }
   };
 
@@ -131,7 +143,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(true);
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      navigate('/auth');
+      
+      setUser(null);
+      setProfile(null);
+      navigate('/auth', { replace: true });
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -154,7 +169,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) throw error;
 
-      // Refresh profile data
       await fetchProfile(user.id);
     } catch (error: any) {
       toast({
