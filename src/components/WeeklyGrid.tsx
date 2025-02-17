@@ -15,12 +15,28 @@ const WeeklyGrid = () => {
     }));
   };
 
+  const toggleEntireDay = (day: string) => {
+    const dayTimeSlots = TIMES.map(time => `${day}-${time}`);
+    const allAvailable = dayTimeSlots.every(slot => availability[slot]);
+    
+    const newAvailability = { ...availability };
+    dayTimeSlots.forEach(slot => {
+      newAvailability[slot] = !allAvailable;
+    });
+    
+    setAvailability(newAvailability);
+  };
+
   return (
     <div className="mt-6">
       <div className="grid grid-cols-7 gap-4">
         {/* Day headers */}
         {DAYS.map((day) => (
-          <div key={day} className="text-center font-semibold mb-2">
+          <div 
+            key={day} 
+            className="text-center font-semibold mb-2 cursor-pointer hover:text-primary transition-colors"
+            onClick={() => toggleEntireDay(day)}
+          >
             {day}
           </div>
         ))}
