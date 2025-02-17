@@ -2,8 +2,11 @@
 import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import SideMenu from "./SideMenu";
+import { useAuth } from "@/hooks/useAuth";
 
 const TopBar = () => {
+  const { profile } = useAuth();
+  
   return (
     <div className="fixed top-0 left-0 right-0 h-16 glass-morphism z-50 px-4 flex items-center justify-between">
       <Sheet>
@@ -20,7 +23,7 @@ const TopBar = () => {
         Availability
       </span>
       <span className="px-4 py-2 rounded-lg font-medium bg-gradient-to-r from-[#9b87f5] to-[#7E69AB] text-white shadow-lg">
-        John Doe
+        {profile?.username || 'Guest'}
       </span>
     </div>
   );
