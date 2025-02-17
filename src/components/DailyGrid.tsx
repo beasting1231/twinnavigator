@@ -1,9 +1,10 @@
-
 import React, { useEffect } from 'react';
 import { format } from "date-fns";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { useAuth } from '@/hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 
 const TIMES = ["7:30", "8:30", "9:45", "11:00", "12:30", "14:00", "15:30", "16:45"];
 
@@ -23,8 +24,17 @@ interface PilotAvailability {
 }
 
 const DailyGrid = ({ selectedDate }: DailyGridProps) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const formattedDate = format(selectedDate, "yyyy-MM-dd");
+
+  // Redirect to auth if not authenticated
+  useEffect(() => {
+    if (!user) {
+      navigate('/auth');
+    }
+  }, [user, navigate]);
   
   // Set up real-time subscription
   useEffect(() => {
@@ -63,7 +73,10 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
   const { data: availabilitiesData } = useQuery({
     queryKey: ['daily-plan', formattedDate],
     queryFn: async () => {
-      // First, get all pilot availabilities with their profiles for the selected date
+      if (!user) {
+        throw new Error('Not authenticated');
+      }
+
       const { data: availabilities, error } = await supabase
         .from('pilot_availability')
         .select(`
@@ -83,16 +96,20 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         throw error;
       }
 
-      // If we have no data, return an empty array
       if (!availabilities) return [];
 
-      // Ensure each availability has the profile data properly structured
       return availabilities.map(avail => ({
         ...avail,
         profiles: avail.profiles || { username: 'Unknown Pilot', id: avail.pilot_id }
       })) as PilotAvailability[];
-    }
+    },
+    enabled: !!user // Only run query when user is authenticated
   });
+
+  // If not authenticated, don't render anything
+  if (!user) {
+    return null;
+  }
 
   // Get unique pilots that have at least one availability slot
   const availablePilots = Array.from(new Set(
