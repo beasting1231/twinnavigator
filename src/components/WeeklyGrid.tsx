@@ -1,6 +1,5 @@
 
 import { useState } from "react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import TimeBlock from "./TimeBlock";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -29,7 +28,7 @@ const WeeklyGrid = () => {
   };
 
   return (
-    <ScrollArea className="w-full mt-6" style={{ overflow: 'auto' }}>
+    <div className="overflow-x-auto pb-4">
       <div className="min-w-[1000px]">
         <div className="grid grid-cols-7 gap-4">
           {/* Day headers */}
@@ -61,7 +60,7 @@ const WeeklyGrid = () => {
           ))}
         </div>
       </div>
-    </ScrollArea>
+    </div>
   );
 };
 
