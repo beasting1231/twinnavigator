@@ -32,6 +32,7 @@ interface Booking {
   pickup_location: string;
   number_of_people: number;
   pilot_id: string;
+  time_slot: string;  // Added this field
   tag_id: string | null;
   tags?: {
     color: string;
