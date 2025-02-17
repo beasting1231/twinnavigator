@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { format } from "date-fns";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -103,10 +104,9 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         profiles: avail.profiles || { username: 'Unknown Pilot', id: avail.pilot_id }
       })) as PilotAvailability[];
     },
-    enabled: !!user // Only run query when user is authenticated
+    enabled: !!user
   });
 
-  // If not authenticated, don't render anything
   if (!user) {
     return null;
   }
@@ -124,6 +124,20 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
   ));
 
   const selectedDay = format(selectedDate, "EEEE MMM d").toUpperCase();
+
+  const isPilotAvailableAtTime = (pilotId: string, time: string) => {
+    return availabilitiesData?.some(
+      (a: PilotAvailability) => 
+        a.pilot_id === pilotId && 
+        a.time_slot === time
+    );
+  };
+
+  const hasPilotAnyAvailabilityOnDay = (pilotId: string) => {
+    return availabilitiesData?.some(
+      (a: PilotAvailability) => a.pilot_id === pilotId
+    );
+  };
 
   return (
     <div className="mt-8 overflow-x-auto pb-4">
@@ -157,19 +171,20 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
               {/* Available slots for each pilot */}
               <div className="grid grid-cols-4 gap-4">
                 {availablePilots.map((pilot) => {
-                  const isAvailable = availabilitiesData?.some(
-                    (a: PilotAvailability) => 
-                      a.pilot_id === pilot.id && 
-                      a.time_slot === time
-                  );
+                  const isAvailable = isPilotAvailableAtTime(pilot.id, time);
+                  const hasAnyAvailability = hasPilotAnyAvailabilityOnDay(pilot.id);
                   
                   return (
                     <div key={`${pilot.id}-${time}`} className="h-[50px]">
-                      {isAvailable && (
+                      {isAvailable ? (
                         <div className="bg-gray-300 rounded-lg p-2 text-sm font-medium text-center h-full w-full">
                           &nbsp;
                         </div>
-                      )}
+                      ) : hasAnyAvailability ? (
+                        <div className="bg-gray-700 rounded-lg p-2 text-sm font-medium text-center text-white h-full w-full">
+                          No {pilot.name}
+                        </div>
+                      ) : null}
                     </div>
                   );
                 })}
