@@ -246,14 +246,18 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
     },
     onSuccess: () => {
       toast({
         title: "Success",
         description: "Booking deleted successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({
+        queryKey: ['bookings', formattedDate]
+      });
     },
     onError: (error) => {
       toast({
@@ -318,8 +322,12 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
   const handleDeleteBooking = async () => {
     if (!selectedBooking) return;
     
-    await deleteBooking.mutate(selectedBooking.id);
-    setSelectedBooking(null);
+    try {
+      await deleteBooking.mutateAsync(selectedBooking.id);
+      setSelectedBooking(null);
+    } catch (error) {
+      console.error('Error deleting booking:', error);
+    }
   };
 
   const getTimeSlotData = (time: string): SlotType[] => {
