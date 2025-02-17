@@ -9,6 +9,63 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      bookings: {
+        Row: {
+          booking_date: string
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          number_of_people: number
+          phone: string | null
+          pickup_location: string
+          pilot_id: string
+          tag_id: string | null
+          time_slot: string
+        }
+        Insert: {
+          booking_date: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          number_of_people: number
+          phone?: string | null
+          pickup_location: string
+          pilot_id: string
+          tag_id?: string | null
+          time_slot: string
+        }
+        Update: {
+          booking_date?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          number_of_people?: number
+          phone?: string | null
+          pickup_location?: string
+          pilot_id?: string
+          tag_id?: string | null
+          time_slot?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_pilot_id_fkey"
+            columns: ["pilot_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pilot_availability: {
         Row: {
           created_at: string
@@ -68,6 +125,27 @@ export type Database = {
           role?: Database["public"]["Enums"]["user_role"] | null
           updated_at?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      tags: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          color: string
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
         }
         Relationships: []
       }

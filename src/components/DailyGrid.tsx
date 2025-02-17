@@ -1,11 +1,13 @@
 
 import React, { useEffect } from 'react';
 import { format } from "date-fns";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from "@/components/ui/use-toast";
+import BookingModal, { BookingFormData } from './BookingModal';
 
 const TIMES = ["7:30", "8:30", "9:45", "11:00", "12:30", "14:00", "15:30", "16:45"];
 
@@ -24,10 +26,28 @@ interface PilotAvailability {
   };
 }
 
+interface Booking {
+  id: string;
+  name: string;
+  pickup_location: string;
+  number_of_people: number;
+  pilot_id: string;
+  tag_id: string | null;
+  tags?: {
+    color: string;
+    name: string;
+  } | null;
+}
+
 const DailyGrid = ({ selectedDate }: DailyGridProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [selectedSlot, setSelectedSlot] = React.useState<{
+    time: string;
+    pilotId: string;
+  } | null>(null);
   const formattedDate = format(selectedDate, "yyyy-MM-dd");
 
   // Redirect to auth if not authenticated
@@ -52,9 +72,21 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
             table: 'pilot_availability'
           },
           () => {
-            // Invalidate and refetch queries when we receive any change
             queryClient.invalidateQueries({
               queryKey: ['daily-plan', formattedDate]
+            });
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'bookings'
+          },
+          () => {
+            queryClient.invalidateQueries({
+              queryKey: ['bookings', formattedDate]
             });
           }
         )
@@ -70,7 +102,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     };
   }, [formattedDate, queryClient]);
 
-  // Fetch availabilities and profiles for the selected date
+  // Fetch availabilities and profiles
   const { data: availabilitiesData } = useQuery({
     queryKey: ['daily-plan', formattedDate],
     queryFn: async () => {
@@ -97,15 +129,83 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         throw error;
       }
 
-      if (!availabilities) return [];
-
-      return availabilities.map(avail => ({
+      return availabilities?.map(avail => ({
         ...avail,
         profiles: avail.profiles || { username: 'Unknown Pilot', id: avail.pilot_id }
       })) as PilotAvailability[];
     },
     enabled: !!user
   });
+
+  // Fetch bookings
+  const { data: bookingsData } = useQuery({
+    queryKey: ['bookings', formattedDate],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select(`
+          id,
+          name,
+          pickup_location,
+          number_of_people,
+          pilot_id,
+          time_slot,
+          tag_id,
+          tags (
+            color,
+            name
+          )
+        `)
+        .eq('booking_date', formattedDate);
+
+      if (error) throw error;
+      return data as Booking[];
+    }
+  });
+
+  const createBooking = useMutation({
+    mutationFn: async (data: BookingFormData & { pilotId: string, date: string, timeSlot: string }) => {
+      const { error } = await supabase
+        .from('bookings')
+        .insert([{
+          pilot_id: data.pilotId,
+          booking_date: data.date,
+          time_slot: data.timeSlot,
+          name: data.name,
+          pickup_location: data.pickup_location,
+          number_of_people: data.number_of_people,
+          phone: data.phone,
+          email: data.email,
+          tag_id: data.tag_id || (await getDefaultTagId())
+        }]);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Booking created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to create booking: " + error.message,
+      });
+    }
+  });
+
+  const getDefaultTagId = async () => {
+    const { data } = await supabase
+      .from('tags')
+      .select('id')
+      .eq('name', 'TWIN')
+      .single();
+    
+    return data?.id;
+  };
 
   if (!user) {
     return null;
@@ -125,6 +225,19 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
   const selectedDay = format(selectedDate, "EEEE MMM d").toUpperCase();
 
+  const handleBookingSubmit = async (formData: BookingFormData) => {
+    if (!selectedSlot) return;
+
+    await createBooking.mutate({
+      ...formData,
+      pilotId: selectedSlot.pilotId,
+      date: formattedDate,
+      timeSlot: selectedSlot.time
+    });
+    
+    setSelectedSlot(null);
+  };
+
   const getTimeSlotData = (time: string) => {
     const slots = availablePilots.map(pilot => {
       const isAvailable = availabilitiesData?.some(
@@ -132,6 +245,11 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
           a.pilot_id === pilot.id && 
           a.time_slot === time
       );
+      
+      const booking = bookingsData?.find(
+        b => b.pilot_id === pilot.id && b.time_slot === time
+      );
+
       const hasAnyAvailability = availabilitiesData?.some(
         (a: PilotAvailability) => a.pilot_id === pilot.id
       );
@@ -139,7 +257,8 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
       return {
         pilot,
         isAvailable,
-        hasAnyAvailability
+        hasAnyAvailability,
+        booking
       };
     });
 
@@ -148,6 +267,10 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
       if (a.isAvailable === b.isAvailable) return 0;
       return a.isAvailable ? -1 : 1;
     });
+  };
+
+  const getAvailablePilotsCount = (time: string) => {
+    return availabilitiesData?.filter(a => a.time_slot === time).length || 0;
   };
 
   return (
@@ -181,11 +304,26 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
               {/* Available slots for each pilot */}
               <div className="grid grid-cols-4 gap-4">
-                {getTimeSlotData(time).map(({ pilot, isAvailable, hasAnyAvailability }) => (
+                {getTimeSlotData(time).map(({ pilot, isAvailable, hasAnyAvailability, booking }) => (
                   <div key={`${pilot.id}-${time}`} className="h-[50px]">
-                    {isAvailable ? (
-                      <div className="bg-gray-300 rounded-lg p-2 text-sm font-medium text-center h-full w-full">
-                        &nbsp;
+                    {booking ? (
+                      <div 
+                        className="rounded-lg p-2 text-sm font-medium h-full w-full text-white"
+                        style={{ 
+                          backgroundColor: booking.tags?.color || '#1EAEDB',
+                          cursor: 'default'
+                        }}
+                      >
+                        <div className="text-xs">{booking.name}</div>
+                        <div className="text-xs">{booking.pickup_location}</div>
+                        <div className="text-xs">{booking.number_of_people} pax</div>
+                      </div>
+                    ) : isAvailable ? (
+                      <div 
+                        className="bg-white rounded-lg p-2 text-sm font-medium text-center h-full w-full cursor-pointer hover:bg-gray-50"
+                        onClick={() => setSelectedSlot({ time, pilotId: pilot.id })}
+                      >
+                        Available
                       </div>
                     ) : hasAnyAvailability ? (
                       <div className="bg-gray-700 rounded-lg p-2 text-sm font-medium text-center text-white h-full w-full">
@@ -203,6 +341,15 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
           Selected Day: {selectedDay}
         </div>
       </div>
+
+      <BookingModal
+        isOpen={!!selectedSlot}
+        onClose={() => setSelectedSlot(null)}
+        onSubmit={handleBookingSubmit}
+        selectedDate={format(selectedDate, "MMM d, yyyy")}
+        timeSlot={selectedSlot?.time || ""}
+        maxPeople={selectedSlot ? getAvailablePilotsCount(selectedSlot.time) : 1}
+      />
     </div>
   );
 };
