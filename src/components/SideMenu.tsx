@@ -7,7 +7,7 @@ const SideMenu = () => {
   const { signOut } = useAuth();
 
   const menuItems = [
-    { icon: CalendarCheck, label: "Daily Plan", path: "/daily-plan" },
+    { icon: CalendarCheck, label: "Daily Plan", path: "/" },
     { icon: Clock, label: "Availability", path: "/availability" },
     { icon: UserCircle, label: "My Account", path: "/account" },
   ];
