@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import TimeBlock from "./TimeBlock";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -28,37 +29,39 @@ const WeeklyGrid = () => {
   };
 
   return (
-    <div className="mt-6">
-      <div className="grid grid-cols-7 gap-4">
-        {/* Day headers */}
-        {DAYS.map((day) => (
-          <div 
-            key={day} 
-            className="text-center font-semibold mb-2 cursor-pointer hover:text-primary transition-colors"
-            onClick={() => toggleEntireDay(day)}
-          >
-            {day}
-          </div>
-        ))}
-        
-        {/* Time blocks */}
-        {DAYS.map((day) => (
-          <div key={day} className="space-y-2">
-            {TIMES.map((time) => {
-              const key = `${day}-${time}`;
-              return (
-                <TimeBlock 
-                  key={key}
-                  time={time}
-                  isAvailable={availability[key]}
-                  onToggle={() => toggleAvailability(key)}
-                />
-              );
-            })}
-          </div>
-        ))}
+    <ScrollArea className="w-full mt-6">
+      <div className="min-w-[800px] pr-4">
+        <div className="grid grid-cols-7 gap-4">
+          {/* Day headers */}
+          {DAYS.map((day) => (
+            <div 
+              key={day} 
+              className="text-center font-semibold mb-2 cursor-pointer hover:text-primary transition-colors"
+              onClick={() => toggleEntireDay(day)}
+            >
+              {day}
+            </div>
+          ))}
+          
+          {/* Time blocks */}
+          {DAYS.map((day) => (
+            <div key={day} className="space-y-2">
+              {TIMES.map((time) => {
+                const key = `${day}-${time}`;
+                return (
+                  <TimeBlock 
+                    key={key}
+                    time={time}
+                    isAvailable={availability[key]}
+                    onToggle={() => toggleAvailability(key)}
+                  />
+                );
+              })}
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+    </ScrollArea>
   );
 };
 
