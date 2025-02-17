@@ -50,6 +50,8 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
       if (error) throw error;
       return data as Availability[];
     },
+    staleTime: 0, // Always consider data stale to ensure fresh data after navigation
+    cacheTime: 0, // Don't cache the data to ensure fresh fetches
   });
 
   // Create availability mutation with optimistic updates
@@ -72,12 +74,15 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
       await queryClient.cancelQueries({ queryKey: ['pilot-availability'] });
 
       // Snapshot the previous value
-      const previousAvailabilities = queryClient.getQueryData(['pilot-availability']);
+      const previousAvailabilities = queryClient.getQueryData(['pilot-availability']) || [];
+
+      // Generate a temporary ID for optimistic update
+      const tempId = `temp-${Date.now()}-${Math.random()}`;
 
       // Optimistically update to the new value
       queryClient.setQueryData(['pilot-availability'], (old: Availability[] = []) => {
         const newAvailability = {
-          id: `temp-${Date.now()}`,
+          id: tempId,
           pilot_id: user?.id!,
           day,
           time_slot: timeSlot,
@@ -97,7 +102,7 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
       });
     },
     onSettled: () => {
-      // Always refetch after error or success to make sure our optimistic update matches the server state
+      // Invalidate and refetch
       queryClient.invalidateQueries({ queryKey: ['pilot-availability'] });
     },
   });
@@ -117,9 +122,13 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
       if (error) throw error;
     },
     onMutate: async ({ day, timeSlot }) => {
+      // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['pilot-availability'] });
-      const previousAvailabilities = queryClient.getQueryData(['pilot-availability']);
 
+      // Snapshot the previous value
+      const previousAvailabilities = queryClient.getQueryData(['pilot-availability']) || [];
+
+      // Optimistically update by removing the item
       queryClient.setQueryData(['pilot-availability'], (old: Availability[] = []) => {
         return old.filter(a => !(a.day === day && a.time_slot === timeSlot && a.pilot_id === user?.id));
       });
@@ -127,6 +136,7 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
       return { previousAvailabilities };
     },
     onError: (err, variables, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
       queryClient.setQueryData(['pilot-availability'], context?.previousAvailabilities);
       toast({
         variant: "destructive",
@@ -135,6 +145,7 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
       });
     },
     onSettled: () => {
+      // Invalidate and refetch
       queryClient.invalidateQueries({ queryKey: ['pilot-availability'] });
     },
   });
