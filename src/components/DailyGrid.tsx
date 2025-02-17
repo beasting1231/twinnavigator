@@ -1,6 +1,9 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { format } from "date-fns";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 const TIMES = ["7:30", "8:30", "9:45", "11:00", "12:30", "14:00", "15:30", "16:45"];
 
@@ -8,24 +11,91 @@ interface DailyGridProps {
   selectedDate: Date;
 }
 
-const DailyGrid = ({ selectedDate }: DailyGridProps) => {
-  // This is temporary mock data - we'll need to integrate with real availability data later
-  const mockPilotAvailability = {
-    "John Smith": {
-      "7:30": true,
-      "11:00": true
-    },
-    "Sarah Johnson": {
-      "8:30": true,
-      "15:30": true
-    },
-    "Mike Wilson": {
-      "12:30": true
-    }
-  };
+interface PilotAvailability {
+  id: string;
+  pilot_id: string;
+  day: string;
+  time_slot: string;
+}
 
-  // Get all pilots that have at least one available time slot
-  const availablePilots = Object.keys(mockPilotAvailability);
+interface Profile {
+  id: string;
+  username: string | null;
+}
+
+const DailyGrid = ({ selectedDate }: DailyGridProps) => {
+  const queryClient = useQueryClient();
+  const formattedDate = format(selectedDate, "yyyy-MM-dd");
+  
+  // Set up real-time subscription
+  useEffect(() => {
+    let channel: RealtimeChannel;
+
+    const setupRealtimeSubscription = () => {
+      channel = supabase
+        .channel('daily-plan-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'pilot_availability'
+          },
+          () => {
+            // Invalidate and refetch queries when we receive any change
+            queryClient.invalidateQueries({
+              queryKey: ['daily-plan', formattedDate]
+            });
+          }
+        )
+        .subscribe();
+    };
+
+    setupRealtimeSubscription();
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [formattedDate, queryClient]);
+
+  // Fetch availabilities and profiles for the selected date
+  const { data: availabilitiesData } = useQuery({
+    queryKey: ['daily-plan', formattedDate],
+    queryFn: async () => {
+      // Fetch all pilot availabilities for the selected date
+      const { data: availabilities, error: availabilityError } = await supabase
+        .from('pilot_availability')
+        .select(`
+          *,
+          profiles:pilot_id(
+            username,
+            id
+          )
+        `)
+        .eq('day', formattedDate);
+
+      if (availabilityError) throw availabilityError;
+
+      // Transform the data to include pilot information
+      const transformedData = availabilities.map((availability: any) => ({
+        ...availability,
+        pilotName: availability.profiles?.username || 'Unknown Pilot'
+      }));
+
+      return transformedData;
+    }
+  });
+
+  // Get unique pilots that have at least one availability slot
+  const availablePilots = Array.from(new Set(
+    (availabilitiesData || [])
+      .map(a => ({ id: a.pilot_id, name: a.pilotName }))
+      .filter((pilot, index, self) => 
+        index === self.findIndex(p => p.id === pilot.id)
+      )
+  ));
 
   const selectedDay = format(selectedDate, "EEEE MMM d").toUpperCase();
 
@@ -42,10 +112,10 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
           <div className="grid grid-cols-3 gap-4">
             {availablePilots.map((pilot) => (
               <div 
-                key={pilot}
+                key={pilot.id}
                 className="text-center font-semibold mb-2"
               >
-                <div>{pilot}</div>
+                <div>{pilot.name}</div>
               </div>
             ))}
           </div>
@@ -61,13 +131,17 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
               {/* Available slots for each pilot */}
               <div className="grid grid-cols-3 gap-4">
                 {availablePilots.map((pilot) => {
-                  const isAvailable = mockPilotAvailability[pilot][time];
+                  const isAvailable = availabilitiesData?.some(
+                    (a: PilotAvailability) => 
+                      a.pilot_id === pilot.id && 
+                      a.time_slot === time
+                  );
                   
                   return (
-                    <div key={`${pilot}-${time}`} className="min-h-[40px]">
+                    <div key={`${pilot.id}-${time}`} className="min-h-[40px]">
                       {isAvailable && (
-                        <div className="bg-green-500/20 text-green-700 rounded-lg p-2 text-sm font-medium text-center">
-                          Available
+                        <div className="bg-gray-100 rounded-lg p-2 text-sm font-medium text-center">
+                          &nbsp;
                         </div>
                       )}
                     </div>
