@@ -22,7 +22,7 @@ const DateNavigator = ({ date, onDateChange }: DateNavigatorProps) => {
   };
 
   return (
-    <div className="flex items-center gap-4 bg-card p-4 rounded-lg">
+    <div className="flex items-center justify-center gap-4 bg-card p-4 rounded-lg">
       <Button
         variant="outline"
         size="icon"

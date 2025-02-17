@@ -4,7 +4,11 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import SideMenu from "./SideMenu";
 import { useAuth } from "@/hooks/useAuth";
 
-const TopBar = () => {
+interface TopBarProps {
+  pageTitle?: string;
+}
+
+const TopBar = ({ pageTitle }: TopBarProps) => {
   const { profile } = useAuth();
   
   return (
@@ -20,7 +24,7 @@ const TopBar = () => {
         </SheetContent>
       </Sheet>
       <span className="absolute left-1/2 -translate-x-1/2 text-white font-medium">
-        Availability
+        {pageTitle}
       </span>
       <span className="px-4 py-2 rounded-lg font-medium bg-gradient-to-r from-[#9b87f5] to-[#7E69AB] text-white shadow-lg">
         {profile?.username || 'Guest'}
