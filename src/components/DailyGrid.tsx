@@ -186,7 +186,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
           number_of_people: data.number_of_people,
           phone: data.phone,
           email: data.email,
-          tag_id: data.tag_id || (await getDefaultTagId())
+          tag_id: data.tag_id
         }]);
 
       if (error) throw error;
@@ -196,7 +196,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         title: "Success",
         description: "Booking created successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['bookings', formattedDate] });
     },
     onError: (error) => {
       toast({
@@ -228,7 +228,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         title: "Success",
         description: "Booking updated successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['bookings', formattedDate] });
     },
     onError: (error) => {
       toast({
@@ -241,38 +241,22 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
   const deleteBooking = useMutation({
     mutationFn: async (id: string) => {
-      console.log('Attempting to delete booking with ID:', id);
-      
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('bookings')
         .delete()
-        .eq('id', id)
-        .select();
+        .eq('id', id);
 
-      if (error) {
-        console.error('Supabase delete error:', error);
-        throw error;
-      }
-
-      console.log('Delete response:', data);
-      return data;
+      if (error) throw error;
     },
-    onSuccess: (data) => {
-      console.log('Delete successful, deleted data:', data);
+    onSuccess: () => {
       toast({
         title: "Success",
         description: "Booking deleted successfully",
       });
-      
-      queryClient.invalidateQueries({
-        queryKey: ['bookings', formattedDate]
-      });
-      queryClient.invalidateQueries({
-        queryKey: ['bookings']
-      });
+      setSelectedBooking(null);
+      queryClient.invalidateQueries({ queryKey: ['bookings', formattedDate] });
     },
     onError: (error) => {
-      console.error('Delete mutation error:', error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -280,33 +264,6 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
       });
     }
   });
-
-  const getDefaultTagId = async () => {
-    const { data } = await supabase
-      .from('tags')
-      .select('id')
-      .eq('name', 'TWIN')
-      .single();
-    
-    return data?.id;
-  };
-
-  if (!user) {
-    return null;
-  }
-
-  const availablePilots = Array.from(new Set(
-    (availabilitiesData || [])
-      .map(a => ({
-        id: a.pilot_id,
-        name: a.profiles.username || 'Unknown Pilot'
-      }))
-      .filter((pilot, index, self) => 
-        index === self.findIndex(p => p.id === pilot.id)
-      )
-  ));
-
-  const selectedDay = format(selectedDate, "EEEE MMM d").toUpperCase();
 
   const handleBookingSubmit = async (formData: BookingFormData) => {
     if (!selectedSlot) return;
@@ -335,13 +292,35 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
   const handleDeleteBooking = async () => {
     if (!selectedBooking) return;
     
-    try {
-      await deleteBooking.mutateAsync(selectedBooking.id);
-      setSelectedBooking(null);
-    } catch (error) {
-      console.error('Error deleting booking:', error);
-    }
+    await deleteBooking.mutate(selectedBooking.id);
   };
+
+  const getDefaultTagId = async () => {
+    const { data } = await supabase
+      .from('tags')
+      .select('id')
+      .eq('name', 'TWIN')
+      .single();
+    
+    return data?.id;
+  };
+
+  if (!user) {
+    return null;
+  }
+
+  const availablePilots = Array.from(new Set(
+    (availabilitiesData || [])
+      .map(a => ({
+        id: a.pilot_id,
+        name: a.profiles.username || 'Unknown Pilot'
+      }))
+      .filter((pilot, index, self) => 
+        index === self.findIndex(p => p.id === pilot.id)
+      )
+  ));
+
+  const selectedDay = format(selectedDate, "EEEE MMM d").toUpperCase();
 
   const getTimeSlotData = (time: string): SlotType[] => {
     const timeBookings = bookingsData?.filter(b => b.time_slot === time) || [];
