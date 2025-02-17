@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { format, addDays, startOfWeek } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
@@ -51,7 +50,7 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
       return data as Availability[];
     },
     staleTime: 0, // Always consider data stale to ensure fresh data after navigation
-    cacheTime: 0, // Don't cache the data to ensure fresh fetches
+    gcTime: 0, // Don't cache the data to ensure fresh fetches (renamed from cacheTime)
   });
 
   // Create availability mutation with optimistic updates
