@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { format } from "date-fns";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -366,21 +365,36 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
       slots.push({ type: 'empty' });
     }
 
+    // Keep track of used positions
+    let usedPositions = new Set<number>();
+
     // Process bookings in order
     timeBookings.forEach(booking => {
       const width = Math.min(booking.number_of_people, 4);
-      const availableIndex = slots.findIndex((slot, index) => {
-        if (slot.type !== 'available') return false;
-        for (let i = 0; i < width; i++) {
-          const nextSlot = slots[index + i];
-          if (!nextSlot || nextSlot.type !== 'available') {
-            return false;
+      
+      // Find the first available position that can fit the booking
+      let availableIndex = -1;
+      for (let i = 0; i <= slots.length - width; i++) {
+        let canFit = true;
+        // Check if any position in the range is already used
+        for (let j = 0; j < width; j++) {
+          if (usedPositions.has(i + j)) {
+            canFit = false;
+            break;
           }
         }
-        return true;
-      });
+        if (canFit) {
+          availableIndex = i;
+          break;
+        }
+      }
 
       if (availableIndex !== -1) {
+        // Mark positions as used
+        for (let i = 0; i < width; i++) {
+          usedPositions.add(availableIndex + i);
+        }
+
         const firstSlot = slots[availableIndex];
         if (firstSlot.type === 'available') {
           slots[availableIndex] = {
@@ -390,6 +404,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
             width
           };
           
+          // Hide subsequent slots
           for (let i = 1; i < width; i++) {
             const subsequentSlot = slots[availableIndex + i];
             if (subsequentSlot.type === 'available') {
@@ -401,6 +416,14 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
           }
         }
       }
+    });
+
+    // Remove available slots that would overlap with bookings
+    slots = slots.map((slot, index) => {
+      if (slot.type === 'available' && usedPositions.has(index)) {
+        return { type: 'empty' };
+      }
+      return slot;
     });
 
     return slots;
