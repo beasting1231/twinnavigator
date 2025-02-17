@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { format } from "date-fns";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -365,11 +364,8 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
       return 0;
     });
 
-    // Create initial slots array with empty slots if needed
+    // Only include actual pilot slots, no empty filling
     let availableSlots: SlotType[] = [...pilotSlots];
-    while (availableSlots.length < maxSlots) {
-      availableSlots.push({ type: 'empty' });
-    }
     availableSlots = availableSlots.slice(0, maxSlots);
 
     // Process bookings
@@ -442,7 +438,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
               <div className="grid grid-cols-4 gap-4">
                 {getTimeSlotData(time).map((slot, index) => {
-                  if (slot.type === 'hidden') return null;
+                  if (slot.type === 'hidden' || slot.type === 'empty') return null;
                   
                   return (
                     <div 
@@ -481,11 +477,6 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
                       {slot.type === 'unavailable' && (
                         <div className="bg-gray-700 rounded-lg p-2 text-sm font-medium text-center text-white h-full">
                           No {slot.pilot.name}
-                        </div>
-                      )}
-                      {slot.type === 'empty' && (
-                        <div className="bg-gray-100 rounded-lg p-2 text-sm font-medium text-center text-gray-400 h-full">
-                          Empty
                         </div>
                       )}
                     </div>
