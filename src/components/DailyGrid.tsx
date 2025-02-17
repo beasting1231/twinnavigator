@@ -341,10 +341,8 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
   const getTimeSlotData = (time: string): SlotType[] => {
     const timeBookings = bookingsData?.filter(b => b.time_slot === time) || [];
     
-    let slots: SlotType[] = new Array(4).fill(null).map((_, index) => {
-      const pilot = availablePilots[index];
-      if (!pilot) return { type: 'empty' };
-      
+    // Create initial slots array
+    let slots: SlotType[] = availablePilots.map(pilot => {
       const isAvailable = availabilitiesData?.some(
         (a: PilotAvailability) => 
           a.pilot_id === pilot.id && 
@@ -355,6 +353,18 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         ? { type: 'available' as const, pilot }
         : { type: 'unavailable' as const, pilot };
     });
+
+    // Sort slots to put available slots first
+    slots.sort((a, b) => {
+      if (a.type === 'available' && b.type === 'unavailable') return -1;
+      if (a.type === 'unavailable' && b.type === 'available') return 1;
+      return 0;
+    });
+
+    // Fill remaining slots if needed
+    while (slots.length < 4) {
+      slots.push({ type: 'empty' });
+    }
 
     // Process bookings in order
     timeBookings.forEach(booking => {
