@@ -1,4 +1,5 @@
 
+import React from 'react';
 import { format, addDays, startOfWeek } from "date-fns";
 
 const TIMES = ["7:30", "8:30", "9:45", "11:00", "12:30", "14:00", "15:30", "16:45"];
