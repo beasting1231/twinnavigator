@@ -125,18 +125,29 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
   const selectedDay = format(selectedDate, "EEEE MMM d").toUpperCase();
 
-  const isPilotAvailableAtTime = (pilotId: string, time: string) => {
-    return availabilitiesData?.some(
-      (a: PilotAvailability) => 
-        a.pilot_id === pilotId && 
-        a.time_slot === time
-    );
-  };
+  const getTimeSlotData = (time: string) => {
+    const slots = availablePilots.map(pilot => {
+      const isAvailable = availabilitiesData?.some(
+        (a: PilotAvailability) => 
+          a.pilot_id === pilot.id && 
+          a.time_slot === time
+      );
+      const hasAnyAvailability = availabilitiesData?.some(
+        (a: PilotAvailability) => a.pilot_id === pilot.id
+      );
 
-  const hasPilotAnyAvailabilityOnDay = (pilotId: string) => {
-    return availabilitiesData?.some(
-      (a: PilotAvailability) => a.pilot_id === pilotId
-    );
+      return {
+        pilot,
+        isAvailable,
+        hasAnyAvailability
+      };
+    });
+
+    // Sort slots to put available ones first
+    return slots.sort((a, b) => {
+      if (a.isAvailable === b.isAvailable) return 0;
+      return a.isAvailable ? -1 : 1;
+    });
   };
 
   return (
@@ -170,24 +181,19 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
               {/* Available slots for each pilot */}
               <div className="grid grid-cols-4 gap-4">
-                {availablePilots.map((pilot) => {
-                  const isAvailable = isPilotAvailableAtTime(pilot.id, time);
-                  const hasAnyAvailability = hasPilotAnyAvailabilityOnDay(pilot.id);
-                  
-                  return (
-                    <div key={`${pilot.id}-${time}`} className="h-[50px]">
-                      {isAvailable ? (
-                        <div className="bg-gray-300 rounded-lg p-2 text-sm font-medium text-center h-full w-full">
-                          &nbsp;
-                        </div>
-                      ) : hasAnyAvailability ? (
-                        <div className="bg-gray-700 rounded-lg p-2 text-sm font-medium text-center text-white h-full w-full">
-                          No {pilot.name}
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
+                {getTimeSlotData(time).map(({ pilot, isAvailable, hasAnyAvailability }) => (
+                  <div key={`${pilot.id}-${time}`} className="h-[50px]">
+                    {isAvailable ? (
+                      <div className="bg-gray-300 rounded-lg p-2 text-sm font-medium text-center h-full w-full">
+                        &nbsp;
+                      </div>
+                    ) : hasAnyAvailability ? (
+                      <div className="bg-gray-700 rounded-lg p-2 text-sm font-medium text-center text-white h-full w-full">
+                        No {pilot.name}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
               </div>
             </React.Fragment>
           ))}
