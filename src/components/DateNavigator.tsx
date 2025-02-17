@@ -8,15 +8,17 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { useState } from "react";
 
-const DateNavigator = () => {
-  const [date, setDate] = useState<Date>(new Date());
+interface DateNavigatorProps {
+  date: Date;
+  onDateChange: (date: Date) => void;
+}
 
+const DateNavigator = ({ date, onDateChange }: DateNavigatorProps) => {
   const navigateDay = (direction: 'prev' | 'next') => {
     const newDate = new Date(date);
     newDate.setDate(date.getDate() + (direction === 'next' ? 1 : -1));
-    setDate(newDate);
+    onDateChange(newDate);
   };
 
   return (
@@ -44,7 +46,7 @@ const DateNavigator = () => {
           <Calendar
             mode="single"
             selected={date}
-            onSelect={(newDate) => newDate && setDate(newDate)}
+            onSelect={(newDate) => newDate && onDateChange(newDate)}
             initialFocus
           />
         </PopoverContent>

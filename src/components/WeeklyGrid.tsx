@@ -5,11 +5,15 @@ import { format, addDays, startOfWeek } from "date-fns";
 
 const TIMES = ["7:30", "8:30", "9:45", "11:00", "12:30", "14:00", "15:30", "16:45"];
 
-const WeeklyGrid = () => {
+interface WeeklyGridProps {
+  selectedDate: Date;
+}
+
+const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
   const [availability, setAvailability] = useState<{ [key: string]: boolean }>({});
 
-  // Get the start of the current week (Monday)
-  const startDate = startOfWeek(new Date(), { weekStartsOn: 1 });
+  // Get the start of the week containing the selected date (Monday)
+  const startDate = startOfWeek(selectedDate, { weekStartsOn: 1 });
   
   // Generate array of 7 days starting from Monday
   const DAYS = Array.from({ length: 7 }, (_, index) => {
