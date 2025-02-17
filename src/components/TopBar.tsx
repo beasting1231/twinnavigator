@@ -16,6 +16,9 @@ const TopBar = () => {
           <SideMenu />
         </SheetContent>
       </Sheet>
+      <span className="absolute left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg font-medium bg-gradient-to-r from-[#9b87f5] to-[#7E69AB] text-white shadow-lg">
+        Availability
+      </span>
       <span className="px-4 py-2 rounded-lg font-medium bg-gradient-to-r from-[#9b87f5] to-[#7E69AB] text-white shadow-lg">
         John Doe
       </span>

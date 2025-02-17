@@ -8,8 +8,7 @@ const Availability = () => {
     <div className="min-h-screen bg-background">
       <TopBar />
       <main className="pt-20 px-4">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-2xl font-semibold mb-6">Availability</h1>
+        <div className="max-w-7xl mx-auto flex flex-col items-center">
           <DateNavigator />
           <WeeklyGrid />
         </div>
