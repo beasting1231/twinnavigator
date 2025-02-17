@@ -9,12 +9,11 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
 
   useEffect(() => {
-    // Only redirect if we're not in a loading state
     if (!loading) {
       if (!user && location.pathname !== '/auth') {
-        navigate('/auth');
+        navigate('/auth', { replace: true });
       } else if (user && profile && !profile.is_onboarded && location.pathname !== '/onboarding') {
-        navigate('/onboarding');
+        navigate('/onboarding', { replace: true });
       }
     }
   }, [user, profile, loading, navigate, location.pathname]);
