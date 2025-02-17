@@ -167,7 +167,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
           )
         `)
         .eq('booking_date', formattedDate)
-        .order('created_at', { ascending: true });  // Add ordering by creation time
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
       return data as Booking[];
@@ -224,11 +224,9 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
       if (error) throw error;
 
-      // Return the updated data
       return data;
     },
     onSuccess: (updatedData) => {
-      // Update the cache manually to preserve order
       queryClient.setQueryData(['bookings', formattedDate], (oldData: Booking[] | undefined) => {
         if (!oldData) return [];
         return oldData.map(booking => 
@@ -339,9 +337,9 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
   const getTimeSlotData = (time: string): SlotType[] => {
     const timeBookings = bookingsData?.filter(b => b.time_slot === time) || [];
+    const maxSlots = 4;
     
-    // Create initial slots array
-    let slots: SlotType[] = availablePilots.map(pilot => {
+    let availableSlots = availablePilots.map(pilot => {
       const isAvailable = availabilitiesData?.some(
         (a: PilotAvailability) => 
           a.pilot_id === pilot.id && 
@@ -353,80 +351,48 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         : { type: 'unavailable' as const, pilot };
     });
 
-    // Sort slots to put available slots first
-    slots.sort((a, b) => {
+    availableSlots.sort((a, b) => {
       if (a.type === 'available' && b.type === 'unavailable') return -1;
       if (a.type === 'unavailable' && b.type === 'available') return 1;
       return 0;
     });
 
-    // Fill remaining slots if needed
-    while (slots.length < 4) {
-      slots.push({ type: 'empty' });
+    while (availableSlots.length < maxSlots) {
+      availableSlots.push({ type: 'empty' });
+    }
+    availableSlots = availableSlots.slice(0, maxSlots);
+
+    let finalSlots: SlotType[] = [...availableSlots];
+    let usedSlots = 0;
+
+    for (const booking of timeBookings) {
+      const width = Math.min(booking.number_of_people, maxSlots - usedSlots);
+      if (width <= 0) continue;
+
+      const availableIndex = finalSlots.findIndex(slot => slot.type === 'available');
+      if (availableIndex === -1) continue;
+
+      const pilot = finalSlots[availableIndex].type === 'available' 
+        ? finalSlots[availableIndex].pilot 
+        : { id: booking.pilot_id, name: 'Unknown Pilot' };
+
+      finalSlots[availableIndex] = {
+        type: 'booking',
+        pilot,
+        booking,
+        width
+      };
+
+      for (let i = 1; i < width; i++) {
+        if (availableIndex + i < maxSlots) {
+          finalSlots[availableIndex + i] = { type: 'hidden', pilot };
+        }
+      }
+
+      usedSlots += width;
     }
 
-    // Keep track of used positions
-    let usedPositions = new Set<number>();
-
-    // Process bookings in order
-    timeBookings.forEach(booking => {
-      const width = Math.min(booking.number_of_people, 4);
-      
-      // Find the first available position that can fit the booking
-      let availableIndex = -1;
-      for (let i = 0; i <= slots.length - width; i++) {
-        let canFit = true;
-        // Check if any position in the range is already used
-        for (let j = 0; j < width; j++) {
-          if (usedPositions.has(i + j)) {
-            canFit = false;
-            break;
-          }
-        }
-        if (canFit) {
-          availableIndex = i;
-          break;
-        }
-      }
-
-      if (availableIndex !== -1) {
-        // Mark positions as used
-        for (let i = 0; i < width; i++) {
-          usedPositions.add(availableIndex + i);
-        }
-
-        const firstSlot = slots[availableIndex];
-        if (firstSlot.type === 'available') {
-          slots[availableIndex] = {
-            type: 'booking',
-            pilot: firstSlot.pilot,
-            booking,
-            width
-          };
-          
-          // Hide subsequent slots
-          for (let i = 1; i < width; i++) {
-            const subsequentSlot = slots[availableIndex + i];
-            if (subsequentSlot.type === 'available') {
-              slots[availableIndex + i] = {
-                type: 'hidden',
-                pilot: subsequentSlot.pilot
-              };
-            }
-          }
-        }
-      }
-    });
-
-    // Remove available slots that would overlap with bookings
-    slots = slots.map((slot, index) => {
-      if (slot.type === 'available' && usedPositions.has(index)) {
-        return { type: 'empty' };
-      }
-      return slot;
-    });
-
-    return slots;
+    return finalSlots;
   };
 
   const getAvailablePilotsCount = (time: string) => {
@@ -459,44 +425,57 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
               </div>
 
               <div className="grid grid-cols-4 gap-4">
-                {getTimeSlotData(time).map((slot, index) => (
-                  <div key={index} className={`h-[50px] relative ${
-                    slot.type === 'hidden' ? 'hidden' : ''
-                  }`}>
-                    {slot.type === 'booking' && (
-                      <div 
-                        className="rounded-lg p-2 text-sm font-medium h-full relative cursor-pointer hover:opacity-90"
-                        style={{ 
-                          backgroundColor: slot.booking.tags?.color || '#1EAEDB',
-                          gridColumn: `span ${slot.width}`,
-                          width: `calc(${slot.width * 100}% + ${(slot.width - 1) * 1}rem)`
-                        }}
-                        onClick={() => setSelectedBooking(slot.booking)}
-                      >
-                        <div className="absolute top-1 right-1 bg-gray-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
-                          {slot.booking.number_of_people}
+                {getTimeSlotData(time).map((slot, index) => {
+                  if (slot.type === 'hidden') return null;
+                  
+                  return (
+                    <div 
+                      key={index} 
+                      className="h-[50px] relative"
+                      style={{
+                        gridColumn: slot.type === 'booking' ? `span ${slot.width}` : undefined,
+                        display: slot.type === 'hidden' ? 'none' : undefined
+                      }}
+                    >
+                      {slot.type === 'booking' && (
+                        <div 
+                          className="rounded-lg p-2 text-sm font-medium h-full cursor-pointer hover:opacity-90"
+                          style={{ 
+                            backgroundColor: slot.booking.tags?.color || '#1EAEDB',
+                            width: '100%'
+                          }}
+                          onClick={() => setSelectedBooking(slot.booking)}
+                        >
+                          <div className="absolute top-1 right-1 bg-gray-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
+                            {slot.booking.number_of_people}
+                          </div>
+                          <div className="flex flex-col text-white text-xs">
+                            <span className="font-medium">{slot.booking.name}</span>
+                            <span>{slot.booking.pickup_location}</span>
+                          </div>
                         </div>
-                        <div className="flex flex-col text-white text-xs">
-                          <span className="font-medium">{slot.booking.name}</span>
-                          <span>{slot.booking.pickup_location}</span>
+                      )}
+                      {slot.type === 'available' && (
+                        <div 
+                          className="bg-white rounded-lg p-2 text-sm font-medium text-center h-full cursor-pointer hover:bg-gray-50"
+                          onClick={() => setSelectedSlot({ time, pilotId: slot.pilot.id })}
+                        >
+                          Available
                         </div>
-                      </div>
-                    )}
-                    {slot.type === 'available' && (
-                      <div 
-                        className="bg-white rounded-lg p-2 text-sm font-medium text-center h-full w-full cursor-pointer hover:bg-gray-50"
-                        onClick={() => setSelectedSlot({ time, pilotId: slot.pilot.id })}
-                      >
-                        Available
-                      </div>
-                    )}
-                    {slot.type === 'unavailable' && (
-                      <div className="bg-gray-700 rounded-lg p-2 text-sm font-medium text-center text-white h-full w-full">
-                        No {slot.pilot.name}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                      )}
+                      {slot.type === 'unavailable' && (
+                        <div className="bg-gray-700 rounded-lg p-2 text-sm font-medium text-center text-white h-full">
+                          No {slot.pilot.name}
+                        </div>
+                      )}
+                      {slot.type === 'empty' && (
+                        <div className="bg-gray-100 rounded-lg p-2 text-sm font-medium text-center text-gray-400 h-full">
+                          Empty
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </React.Fragment>
           ))}
