@@ -9,9 +9,9 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
 
   useEffect(() => {
+    // Only redirect if we're not in a loading state
     if (!loading) {
-      // If not loading and no user, redirect to auth
-      if (!user) {
+      if (!user && location.pathname !== '/auth') {
         navigate('/auth');
       } else if (user && profile && !profile.is_onboarded && location.pathname !== '/onboarding') {
         navigate('/onboarding');
@@ -28,6 +28,11 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  // Only render children if we have a user
-  return user ? <>{children}</> : null;
+  // If we're not logged in and on a protected route, don't render anything
+  if (!user && location.pathname !== '/auth') {
+    return null;
+  }
+
+  // Render children if we're either logged in or on the auth page
+  return <>{children}</>;
 };

@@ -22,6 +22,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -40,34 +41,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Handle initial session
   useEffect(() => {
-    // Initial session check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          await fetchProfile(session.user.id);
+        }
+      } catch (error) {
+        console.error('Error checking initial session:', error);
+      } finally {
+        setLoading(false);
+        setInitialLoadComplete(true);
       }
-      setLoading(false);
-    });
+    };
 
-    // Set up auth state change listener
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchProfile(session.user.id);
-      } else {
-        setProfile(null);
+    initializeAuth();
+  }, []);
+
+  // Set up auth state change listener
+  useEffect(() => {
+    if (!initialLoadComplete) return;
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          await fetchProfile(session.user.id);
+        } else {
+          setProfile(null);
+        }
       }
-      setLoading(false);
-    });
+    );
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [initialLoadComplete]);
 
   const signIn = async (email: string, password: string) => {
     try {
+      setLoading(true);
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -82,11 +98,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: error.message,
       });
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const signUp = async (email: string, password: string) => {
     try {
+      setLoading(true);
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -104,12 +123,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: error.message,
       });
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    navigate('/auth');
+    try {
+      setLoading(true);
+      await supabase.auth.signOut();
+      navigate('/auth');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const updateProfile = async (data: Partial<Profile>) => {
