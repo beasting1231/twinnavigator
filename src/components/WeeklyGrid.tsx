@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { format, addDays, startOfWeek } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,13 +23,6 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    console.log('WeeklyGrid mounted', { user, profile, selectedDate });
-    return () => {
-      console.log('WeeklyGrid unmounting');
-    };
-  }, [user, profile, selectedDate]);
-
   const startDate = startOfWeek(selectedDate, { weekStartsOn: 1 });
   
   const DAYS = Array.from({ length: 7 }, (_, index) => {
@@ -41,34 +34,24 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
     };
   });
 
-  const { data: availabilities = [], status: queryStatus, error: queryError } = useQuery({
-    queryKey: ['pilot-availability', startDate],
+  const { data: availabilities = [] } = useQuery({
+    queryKey: ['pilot-availability', startDate.toISOString()],
     queryFn: async () => {
-      console.log('Fetching availability data for week starting:', startDate);
       const { data, error } = await supabase
         .from('pilot_availability')
         .select('*')
         .gte('day', DAYS[0].date)
         .lte('day', DAYS[6].date);
 
-      if (error) {
-        console.error('Error fetching availability:', error);
-        throw error;
-      }
-      console.log('Fetched availability data:', data);
+      if (error) throw error;
       return data as Availability[];
     },
-    staleTime: 0,
-    gcTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
-
-  useEffect(() => {
-    console.log('Query status changed:', { queryStatus, queryError, availabilitiesCount: availabilities?.length });
-  }, [queryStatus, queryError, availabilities]);
 
   const createAvailability = useMutation({
     mutationFn: async ({ day, timeSlot }: { day: string; timeSlot: string }) => {
-      console.log('Creating availability:', { day, timeSlot });
       const { error } = await supabase
         .from('pilot_availability')
         .insert([
@@ -79,50 +62,51 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
           },
         ]);
 
-      if (error) {
-        console.error('Error creating availability:', error);
-        throw error;
-      }
+      if (error) throw error;
     },
     onMutate: async ({ day, timeSlot }) => {
-      console.log('Starting optimistic update for create:', { day, timeSlot });
-      await queryClient.cancelQueries({ queryKey: ['pilot-availability'] });
-      const previousAvailabilities = queryClient.getQueryData(['pilot-availability']) || [];
-      const tempId = `temp-${Date.now()}-${Math.random()}`;
-      
-      queryClient.setQueryData(['pilot-availability'], (old: Availability[] = []) => {
-        const newAvailability = {
-          id: tempId,
-          pilot_id: user?.id!,
-          day,
-          time_slot: timeSlot,
-        };
-        return [...old, newAvailability];
+      await queryClient.cancelQueries({ 
+        queryKey: ['pilot-availability', startDate.toISOString()]
       });
+      
+      const previousAvailabilities = queryClient.getQueryData(
+        ['pilot-availability', startDate.toISOString()]
+      ) as Availability[] || [];
+
+      const newAvailability = {
+        id: `temp-${day}-${timeSlot}`,
+        pilot_id: user?.id!,
+        day,
+        time_slot: timeSlot,
+      };
+
+      queryClient.setQueryData(
+        ['pilot-availability', startDate.toISOString()],
+        (old: Availability[] = []) => [...old, newAvailability]
+      );
 
       return { previousAvailabilities };
     },
-    onSuccess: () => {
-      console.log('Availability created successfully');
-    },
     onError: (err, variables, context) => {
-      console.error('Error in create mutation:', err);
-      queryClient.setQueryData(['pilot-availability'], context?.previousAvailabilities);
+      queryClient.setQueryData(
+        ['pilot-availability', startDate.toISOString()],
+        context?.previousAvailabilities
+      );
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to update availability. Please try again.",
+        description: "Failed to update availability.",
       });
     },
     onSettled: () => {
-      console.log('Create mutation settled, invalidating queries');
-      queryClient.invalidateQueries({ queryKey: ['pilot-availability'] });
+      queryClient.invalidateQueries({
+        queryKey: ['pilot-availability', startDate.toISOString()]
+      });
     },
   });
 
   const deleteAvailability = useMutation({
     mutationFn: async ({ day, timeSlot }: { day: string; timeSlot: string }) => {
-      console.log('Deleting availability:', { day, timeSlot });
       const { error } = await supabase
         .from('pilot_availability')
         .delete()
@@ -132,85 +116,75 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
           time_slot: timeSlot,
         });
 
-      if (error) {
-        console.error('Error deleting availability:', error);
-        throw error;
-      }
+      if (error) throw error;
     },
     onMutate: async ({ day, timeSlot }) => {
-      console.log('Starting optimistic update for delete:', { day, timeSlot });
-      await queryClient.cancelQueries({ queryKey: ['pilot-availability'] });
-      const previousAvailabilities = queryClient.getQueryData(['pilot-availability']) || [];
-
-      queryClient.setQueryData(['pilot-availability'], (old: Availability[] = []) => {
-        return old.filter(a => !(a.day === day && a.time_slot === timeSlot && a.pilot_id === user?.id));
+      await queryClient.cancelQueries({
+        queryKey: ['pilot-availability', startDate.toISOString()]
       });
+
+      const previousAvailabilities = queryClient.getQueryData(
+        ['pilot-availability', startDate.toISOString()]
+      ) as Availability[] || [];
+
+      queryClient.setQueryData(
+        ['pilot-availability', startDate.toISOString()],
+        (old: Availability[] = []) => 
+          old.filter(a => !(a.day === day && a.time_slot === timeSlot && a.pilot_id === user?.id))
+      );
 
       return { previousAvailabilities };
     },
-    onSuccess: () => {
-      console.log('Availability deleted successfully');
-    },
     onError: (err, variables, context) => {
-      console.error('Error in delete mutation:', err);
-      queryClient.setQueryData(['pilot-availability'], context?.previousAvailabilities);
+      queryClient.setQueryData(
+        ['pilot-availability', startDate.toISOString()],
+        context?.previousAvailabilities
+      );
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to update availability. Please try again.",
+        description: "Failed to update availability.",
       });
     },
     onSettled: () => {
-      console.log('Delete mutation settled, invalidating queries');
-      queryClient.invalidateQueries({ queryKey: ['pilot-availability'] });
+      queryClient.invalidateQueries({
+        queryKey: ['pilot-availability', startDate.toISOString()]
+      });
     },
   });
 
-  const handleAvailabilityToggle = (day: string, timeSlot: string) => {
-    console.log('Handling availability toggle:', { day, timeSlot, user: user?.id });
-    if (!user?.id) {
-      console.error('No user ID available for availability toggle');
-      return;
-    }
+  const handleAvailabilityToggle = useCallback((day: string, timeSlot: string) => {
+    if (!user?.id) return;
 
     const isCurrentlyAvailable = availabilities.some(
       (a) => a.day === day && a.time_slot === timeSlot && a.pilot_id === user?.id
     );
-    
-    console.log('Current availability status:', { isCurrentlyAvailable });
 
     if (isCurrentlyAvailable) {
       deleteAvailability.mutate({ day, timeSlot });
     } else {
       createAvailability.mutate({ day, timeSlot });
     }
-  };
+  }, [user?.id, availabilities, createAvailability, deleteAvailability]);
 
-  const handleDayToggle = (day: string) => {
-    console.log('Handling day toggle:', { day, user: user?.id });
-    if (!user?.id) {
-      console.error('No user ID available for day toggle');
-      return;
-    }
+  const handleDayToggle = useCallback((day: string) => {
+    if (!user?.id) return;
 
     const dayAvailabilities = availabilities.filter(
       (a) => a.day === day && a.pilot_id === user?.id
     );
 
     const shouldMakeAvailable = dayAvailabilities.length < TIMES.length;
-    console.log('Day toggle status:', { shouldMakeAvailable, currentAvailabilities: dayAvailabilities.length });
 
     if (shouldMakeAvailable) {
       const unavailableTimeSlots = TIMES.filter(
         time => !dayAvailabilities.some(a => a.time_slot === time)
       );
       
-      console.log('Adding availability for time slots:', unavailableTimeSlots);
       unavailableTimeSlots.forEach(timeSlot => {
         createAvailability.mutate({ day, timeSlot });
       });
     } else {
-      console.log('Removing availability for all time slots');
       dayAvailabilities.forEach(availability => {
         deleteAvailability.mutate({ 
           day: availability.day, 
@@ -218,13 +192,9 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
         });
       });
     }
-  };
+  }, [user?.id, availabilities, createAvailability, deleteAvailability, TIMES]);
 
   const isPilot = profile?.role === 'pilot';
-  
-  useEffect(() => {
-    console.log('Pilot status:', { isPilot, profileRole: profile?.role });
-  }, [isPilot, profile]);
 
   return (
     <div className="mt-8 overflow-x-auto pb-4">
