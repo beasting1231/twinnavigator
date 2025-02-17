@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { format, addDays, startOfWeek } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
@@ -127,6 +126,36 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
     }
   };
 
+  const handleDayToggle = (day: string) => {
+    const dayAvailabilities = availabilities.filter(
+      (a) => a.day === day && a.pilot_id === user?.id
+    );
+
+    // If all time slots are available, make them all unavailable
+    // Otherwise, make all unavailable slots available
+    const shouldMakeAvailable = dayAvailabilities.length < TIMES.length;
+
+    if (shouldMakeAvailable) {
+      // Find time slots that aren't already available
+      const unavailableTimeSlots = TIMES.filter(
+        time => !dayAvailabilities.some(a => a.time_slot === time)
+      );
+      
+      // Make all unavailable slots available
+      unavailableTimeSlots.forEach(timeSlot => {
+        createAvailability.mutate({ day, timeSlot });
+      });
+    } else {
+      // Make all slots unavailable
+      dayAvailabilities.forEach(availability => {
+        deleteAvailability.mutate({ 
+          day: availability.day, 
+          timeSlot: availability.time_slot 
+        });
+      });
+    }
+  };
+
   // Check if the current user is a pilot
   const isPilot = profile?.role === 'pilot';
 
@@ -144,7 +173,8 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
             {DAYS.map((day) => (
               <div 
                 key={day.fullName}
-                className="text-center font-semibold mb-2"
+                className="text-center font-semibold mb-2 cursor-pointer"
+                onClick={() => isPilot && handleDayToggle(day.date)}
               >
                 <div>{day.displayDate}</div>
               </div>
@@ -173,7 +203,7 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
                       onClick={() => isPilot && handleAvailabilityToggle(day.date, time)}
                     >
                       {isAvailable && (
-                        <div className={`bg-green-500/20 text-green-700 rounded-lg p-2 text-sm font-medium text-center ${isPilot ? 'cursor-pointer hover:bg-green-500/30' : ''}`}>
+                        <div className="bg-green-500/20 text-green-700 rounded-lg p-2 text-sm font-medium text-center cursor-pointer hover:bg-green-500/30">
                           Available
                         </div>
                       )}
