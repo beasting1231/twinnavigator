@@ -153,7 +153,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
   return (
     <div className="mt-8 overflow-x-auto pb-4">
       <div className="min-w-[1000px]">
-        <div className="grid grid-cols-[120px_1fr] gap-0">
+        <div className="grid grid-cols-[120px_1fr] gap-4">
           {/* Time column header */}
           <div className="font-semibold mb-2">
             Time
