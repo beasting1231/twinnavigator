@@ -15,11 +15,10 @@ interface PilotAvailability {
   pilot_id: string;
   day: string;
   time_slot: string;
-}
-
-interface Profile {
-  id: string;
-  username: string | null;
+  profiles: {
+    username: string | null;
+    id: string;
+  } | null;
 }
 
 const DailyGrid = ({ selectedDate }: DailyGridProps) => {
@@ -63,12 +62,14 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
   const { data: availabilitiesData } = useQuery({
     queryKey: ['daily-plan', formattedDate],
     queryFn: async () => {
-      // Fetch all pilot availabilities for the selected date
       const { data: availabilities, error: availabilityError } = await supabase
         .from('pilot_availability')
         .select(`
-          *,
-          profiles:pilot_id(
+          id,
+          pilot_id,
+          day,
+          time_slot,
+          profiles (
             username,
             id
           )
@@ -76,21 +77,17 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         .eq('day', formattedDate);
 
       if (availabilityError) throw availabilityError;
-
-      // Transform the data to include pilot information
-      const transformedData = availabilities.map((availability: any) => ({
-        ...availability,
-        pilotName: availability.profiles?.username || 'Unknown Pilot'
-      }));
-
-      return transformedData;
+      return availabilities as PilotAvailability[];
     }
   });
 
   // Get unique pilots that have at least one availability slot
   const availablePilots = Array.from(new Set(
     (availabilitiesData || [])
-      .map(a => ({ id: a.pilot_id, name: a.pilotName }))
+      .map(a => ({
+        id: a.pilot_id,
+        name: a.profiles?.username || 'Unknown Pilot'
+      }))
       .filter((pilot, index, self) => 
         index === self.findIndex(p => p.id === pilot.id)
       )
