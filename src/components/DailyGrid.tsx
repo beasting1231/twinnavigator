@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { format } from "date-fns";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -45,12 +46,16 @@ interface Pilot {
   name: string;
 }
 
+type SlotBaseType = {
+  pilot?: Pilot;
+};
+
 type SlotType = 
-  | { type: 'empty' }
-  | { type: 'available'; pilot: Pilot }
-  | { type: 'unavailable'; pilot: Pilot }
-  | { type: 'booking'; pilot: Pilot; booking: Booking; width: number }
-  | { type: 'hidden'; pilot: Pilot };
+  | (SlotBaseType & { type: 'empty' })
+  | (SlotBaseType & { type: 'available'; pilot: Pilot })
+  | (SlotBaseType & { type: 'unavailable'; pilot: Pilot })
+  | (SlotBaseType & { type: 'booking'; pilot: Pilot; booking: Booking; width: number })
+  | (SlotBaseType & { type: 'hidden'; pilot: Pilot });
 
 const DailyGrid = ({ selectedDate }: DailyGridProps) => {
   const { user } = useAuth();
@@ -339,6 +344,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     const timeBookings = bookingsData?.filter(b => b.time_slot === time) || [];
     const maxSlots = 4;
     
+    // Get available pilots for this time slot
     let availableSlots = availablePilots.map(pilot => {
       const isAvailable = availabilitiesData?.some(
         (a: PilotAvailability) => 
@@ -351,17 +357,20 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         : { type: 'unavailable' as const, pilot };
     });
 
+    // Sort to put available slots first
     availableSlots.sort((a, b) => {
       if (a.type === 'available' && b.type === 'unavailable') return -1;
       if (a.type === 'unavailable' && b.type === 'available') return 1;
       return 0;
     });
 
+    // Fill to ensure we have exactly 4 slots
     while (availableSlots.length < maxSlots) {
-      availableSlots.push({ type: 'empty' });
+      availableSlots.push({ type: 'empty' } as SlotType);
     }
     availableSlots = availableSlots.slice(0, maxSlots);
 
+    // Process bookings
     let finalSlots: SlotType[] = [...availableSlots];
     let usedSlots = 0;
 
@@ -369,9 +378,11 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
       const width = Math.min(booking.number_of_people, maxSlots - usedSlots);
       if (width <= 0) continue;
 
+      // Find first available slot
       const availableIndex = finalSlots.findIndex(slot => slot.type === 'available');
       if (availableIndex === -1) continue;
 
+      // Create booking slot
       const pilot = finalSlots[availableIndex].type === 'available' 
         ? finalSlots[availableIndex].pilot 
         : { id: booking.pilot_id, name: 'Unknown Pilot' };
@@ -383,6 +394,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         width
       };
 
+      // Hide subsequent slots
       for (let i = 1; i < width; i++) {
         if (availableIndex + i < maxSlots) {
           finalSlots[availableIndex + i] = { type: 'hidden', pilot };
@@ -433,8 +445,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
                       key={index} 
                       className="h-[50px] relative"
                       style={{
-                        gridColumn: slot.type === 'booking' ? `span ${slot.width}` : undefined,
-                        display: slot.type === 'hidden' ? 'none' : undefined
+                        gridColumn: slot.type === 'booking' ? `span ${slot.width}` : undefined
                       }}
                     >
                       {slot.type === 'booking' && (
