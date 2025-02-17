@@ -262,8 +262,10 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
       };
     });
 
-    // Sort slots to put available ones first
+    // Sort slots to put bookings first, then available slots
     return slots.sort((a, b) => {
+      if (a.booking && !b.booking) return -1;
+      if (!a.booking && b.booking) return 1;
       if (a.isAvailable === b.isAvailable) return 0;
       return a.isAvailable ? -1 : 1;
     });
@@ -305,18 +307,20 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
               {/* Available slots for each pilot */}
               <div className="grid grid-cols-4 gap-4">
                 {getTimeSlotData(time).map(({ pilot, isAvailable, hasAnyAvailability, booking }) => (
-                  <div key={`${pilot.id}-${time}`} className="h-[50px]">
+                  <div key={`${pilot.id}-${time}`} className="h-[50px] relative">
                     {booking ? (
                       <div 
-                        className="rounded-lg p-2 text-sm font-medium h-full w-full text-white"
+                        className="rounded-lg p-2 text-sm font-medium h-full w-full relative"
                         style={{ 
                           backgroundColor: booking.tags?.color || '#1EAEDB',
                           cursor: 'default'
                         }}
                       >
-                        <div className="text-xs">{booking.name}</div>
-                        <div className="text-xs">{booking.pickup_location}</div>
-                        <div className="text-xs">{booking.number_of_people} pax</div>
+                        <div className="absolute top-1 right-1 bg-gray-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
+                          {booking.number_of_people}
+                        </div>
+                        <div className="text-xs text-white mt-4">{booking.name}</div>
+                        <div className="text-xs text-white">{booking.pickup_location}</div>
                       </div>
                     ) : isAvailable ? (
                       <div 
