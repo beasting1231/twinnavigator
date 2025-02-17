@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { format } from "date-fns";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -109,7 +108,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
           </div>
           
           {/* Pilots header */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             {availablePilots.map((pilot) => (
               <div 
                 key={pilot.id}
@@ -129,7 +128,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
               </div>
 
               {/* Available slots for each pilot */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 {availablePilots.map((pilot) => {
                   const isAvailable = availabilitiesData?.some(
                     (a: PilotAvailability) => 
@@ -138,9 +137,9 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
                   );
                   
                   return (
-                    <div key={`${pilot.id}-${time}`} className="min-h-[40px]">
+                    <div key={`${pilot.id}-${time}`} className="h-[50px]">
                       {isAvailable && (
-                        <div className="bg-gray-100 rounded-lg p-2 text-sm font-medium text-center">
+                        <div className="bg-gray-300 rounded-lg p-2 text-sm font-medium text-center h-full w-full">
                           &nbsp;
                         </div>
                       )}
