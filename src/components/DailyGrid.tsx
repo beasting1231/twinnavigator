@@ -320,8 +320,10 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
                         <div className="absolute top-1 right-1 bg-gray-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
                           {booking.number_of_people}
                         </div>
-                        <div className="text-xs text-white mt-4">{booking.name}</div>
-                        <div className="text-xs text-white">{booking.pickup_location}</div>
+                        <div className="flex flex-col text-white text-xs">
+                          <span className="font-medium">{booking.name}</span>
+                          <span>{booking.pickup_location}</span>
+                        </div>
                       </div>
                     ) : isAvailable ? (
                       <div 
