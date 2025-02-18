@@ -32,6 +32,7 @@ interface BookingModalProps {
 }
 
 export interface BookingFormData {
+  id?: string;  // Adding id as optional since it's only needed for updates
   name: string;
   pickup_location: string;
   number_of_people: number;

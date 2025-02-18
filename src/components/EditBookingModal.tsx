@@ -30,7 +30,7 @@ interface EditBookingModalProps {
   onDelete: () => void;
   onSubmit: (data: BookingFormData) => void;
   booking: {
-    id: string; // Adding this explicitly
+    id: string;
     name: string;
     pickup_location: string;
     number_of_people: number;
@@ -42,6 +42,7 @@ interface EditBookingModalProps {
 }
 
 const bookingSchema = z.object({
+  id: z.string().optional(),
   name: z.string().min(1, "Name is required"),
   pickup_location: z.string().min(1, "Pickup location is required"),
   number_of_people: z.number().min(1).max(100),
@@ -70,6 +71,7 @@ const EditBookingModal = ({
   } = useForm<BookingFormData>({
     resolver: zodResolver(bookingSchema),
     defaultValues: {
+      id: booking.id,
       name: booking.name,
       pickup_location: booking.pickup_location,
       number_of_people: booking.number_of_people,
@@ -100,7 +102,7 @@ const EditBookingModal = ({
     try {
       await onSubmit({
         ...data,
-        id: booking.id, // Ensure we're passing the ID
+        id: booking.id,
       });
       console.log('EditBookingModal - onSubmit completed successfully');
       onClose();
@@ -113,6 +115,7 @@ const EditBookingModal = ({
     if (isOpen) {
       console.log('EditBookingModal - Resetting form with booking:', booking);
       reset({
+        id: booking.id,
         name: booking.name,
         pickup_location: booking.pickup_location,
         number_of_people: booking.number_of_people,
@@ -139,6 +142,9 @@ const EditBookingModal = ({
           }} 
           className="space-y-4"
         >
+          {/* Hidden input for id */}
+          <input type="hidden" {...register('id')} />
+          
           <div>
             <Label htmlFor="name">Name *</Label>
             <Input
