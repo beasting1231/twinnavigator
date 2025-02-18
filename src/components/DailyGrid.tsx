@@ -411,8 +411,8 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
   const selectedDay = format(selectedDate, "EEEE MMM d").toUpperCase();
 
-  // Changed from 120px to 80px for the time column
-  const gridColumns = `80px ${availablePilots.map(() => 'minmax(180px, 180px)').join(' ')}`;
+  // Changed to 60px which is just enough for the time text
+  const gridColumns = `60px ${availablePilots.map(() => 'minmax(180px, 180px)').join(' ')}`;
 
   return (
     <div className="mt-8 overflow-x-auto pb-4">
@@ -424,7 +424,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
             gap: '1rem'
           }}
         >
-          <div className="font-semibold mb-2">
+          <div className="font-semibold mb-2 text-sm">
             Time
           </div>
           
@@ -439,7 +439,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
           {TIMES.map((time) => (
             <React.Fragment key={time}>
-              <div className="py-2 font-medium text-muted-foreground text-sm">
+              <div className="py-2 font-medium text-muted-foreground text-xs">
                 {time}
               </div>
 
