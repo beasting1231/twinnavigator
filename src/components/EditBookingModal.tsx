@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -7,9 +6,6 @@ import { format, parseISO } from 'date-fns';
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
@@ -118,13 +114,13 @@ const EditBookingModal = ({
       
       const updatedData = {
         ...data,
-        id: booking.id, // Make sure to include the ID
+        id: booking.id,
         booking_date: formattedDate,
       };
       
       console.log('EditBookingModal - Submitting with updatedData:', updatedData);
       await onSubmit(updatedData);
-      onClose(); // Close the modal after successful submission
+      onClose();
     } catch (error) {
       console.error('EditBookingModal - Error submitting form:', error);
     }
@@ -156,12 +152,6 @@ const EditBookingModal = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle className="pr-8">Edit Booking</DialogTitle>
-          <DialogDescription>
-            Make changes to your booking here. Click save when you're done.
-          </DialogDescription>
-        </DialogHeader>
         <form 
           onSubmit={(e) => {
             e.preventDefault();
