@@ -275,31 +275,31 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
   const updateBooking = useMutation({
     mutationFn: async (data: BookingFormData & { id: string }) => {
+      console.log('Updating booking with data:', data); // Debug log
+
       const { error } = await supabase
         .from('bookings')
         .update({
           name: data.name,
           pickup_location: data.pickup_location,
           number_of_people: data.number_of_people,
-          phone: data.phone,
-          email: data.email,
-          tag_id: data.tag_id
+          phone: data.phone || null,
+          email: data.email || null,
+          tag_id: data.tag_id || null,
         })
         .eq('id', data.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating booking:', error); // Debug log
+        throw error;
+      }
 
       return data;
     },
     onSuccess: (updatedData) => {
-      queryClient.setQueryData(['bookings', formattedDate], (oldData: Booking[] | undefined) => {
-        if (!oldData) return [];
-        return oldData.map(booking => 
-          booking.id === updatedData.id 
-            ? { ...booking, ...updatedData }
-            : booking
-        );
-      });
+      console.log('Update successful:', updatedData); // Debug log
+      
+      queryClient.invalidateQueries({ queryKey: ['bookings', formattedDate] });
 
       toast({
         title: "Success",
@@ -309,6 +309,8 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
       setSelectedBooking(null);
     },
     onError: (error) => {
+      console.error('Update error:', error); // Debug log
+      
       toast({
         variant: "destructive",
         title: "Error",
@@ -357,14 +359,17 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
   };
 
   const handleUpdateBooking = async (data: BookingFormData) => {
-    if (!selectedBooking) return;
+    if (!selectedBooking) {
+      console.error('No booking selected for update'); // Debug log
+      return;
+    }
+    
+    console.log('Handling booking update:', { data, bookingId: selectedBooking.id }); // Debug log
     
     await updateBooking.mutate({
       ...data,
       id: selectedBooking.id
     });
-    
-    setSelectedBooking(null);
   };
 
   const handleDeleteBooking = async () => {
