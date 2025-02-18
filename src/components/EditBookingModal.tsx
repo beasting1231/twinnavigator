@@ -197,9 +197,11 @@ const EditBookingModal = ({
               type="submit"
               onClick={async (e) => {
                 e.preventDefault();
-                const result = await handleSubmit(handleFormSubmit)();
-                if (result) {
+                try {
+                  await handleSubmit(handleFormSubmit)(e);
                   onClose();
+                } catch (error) {
+                  console.error('Error submitting form:', error);
                 }
               }}
             >
