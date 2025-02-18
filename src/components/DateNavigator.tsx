@@ -7,7 +7,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { format } from "date-fns";
+import { format, addWeeks, subWeeks } from "date-fns";
 
 interface DateNavigatorProps {
   date: Date;
@@ -15,9 +15,10 @@ interface DateNavigatorProps {
 }
 
 const DateNavigator = ({ date, onDateChange }: DateNavigatorProps) => {
-  const navigateDay = (direction: 'prev' | 'next') => {
-    const newDate = new Date(date);
-    newDate.setDate(date.getDate() + (direction === 'next' ? 1 : -1));
+  const navigateWeek = (direction: 'prev' | 'next') => {
+    const newDate = direction === 'next' 
+      ? addWeeks(date, 1)
+      : subWeeks(date, 1);
     onDateChange(newDate);
   };
 
@@ -26,7 +27,7 @@ const DateNavigator = ({ date, onDateChange }: DateNavigatorProps) => {
       <Button
         variant="outline"
         size="icon"
-        onClick={() => navigateDay('prev')}
+        onClick={() => navigateWeek('prev')}
         className="h-8 w-8"
       >
         <ChevronLeft className="h-4 w-4" />
@@ -55,7 +56,7 @@ const DateNavigator = ({ date, onDateChange }: DateNavigatorProps) => {
       <Button
         variant="outline"
         size="icon"
-        onClick={() => navigateDay('next')}
+        onClick={() => navigateWeek('next')}
         className="h-8 w-8"
       >
         <ChevronRight className="h-4 w-4" />
