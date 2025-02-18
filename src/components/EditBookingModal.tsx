@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -118,8 +119,33 @@ const EditBookingModal = ({
     }
   });
 
+  const { data: availablePilotsForTime = {} } = useQuery({
+    queryKey: ['available-pilots-count', booking.booking_date],
+    enabled: !!booking.booking_date,
+    queryFn: async () => {
+      if (!booking.booking_date) {
+        throw new Error('Booking date is required');
+      }
+
+      const { data: availabilities, error } = await supabase
+        .from('pilot_availability')
+        .select('time_slot, pilot_id')
+        .eq('day', booking.booking_date);
+
+      if (error) throw error;
+
+      const pilotCounts: Record<string, number> = {};
+      availabilities?.forEach(availability => {
+        pilotCounts[availability.time_slot] = (pilotCounts[availability.time_slot] || 0) + 1;
+      });
+
+      return pilotCounts;
+    }
+  });
+
   const { data: assignedPilotIds = [] } = useQuery({
     queryKey: ['assigned-pilot-ids', booking.id],
+    enabled: !!booking.id,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pilot_assignments')
@@ -147,28 +173,14 @@ const EditBookingModal = ({
     }
   });
 
-  const { data: availablePilotsForTime = {} } = useQuery({
-    queryKey: ['available-pilots-count', booking.booking_date],
-    queryFn: async () => {
-      const { data: availabilities, error } = await supabase
-        .from('pilot_availability')
-        .select('time_slot, pilot_id')
-        .eq('day', booking.booking_date);
-
-      if (error) throw error;
-
-      const pilotCounts: Record<string, number> = {};
-      availabilities?.forEach(availability => {
-        pilotCounts[availability.time_slot] = (pilotCounts[availability.time_slot] || 0) + 1;
-      });
-
-      return pilotCounts;
-    }
-  });
-
   const { data: availablePilots = [] } = useQuery({
     queryKey: ['available-pilots', booking.booking_date, selectedTimeSlot],
+    enabled: !!booking.booking_date && !!selectedTimeSlot,
     queryFn: async () => {
+      if (!booking.booking_date || !selectedTimeSlot) {
+        throw new Error('Booking date and time slot are required');
+      }
+
       const { data: availabilities, error: availabilitiesError } = await supabase
         .from('pilot_availability')
         .select(`
