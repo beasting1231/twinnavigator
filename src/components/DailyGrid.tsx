@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { format } from "date-fns";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -342,7 +343,6 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
   const getTimeSlotData = (time: string): SlotType[] => {
     const timeBookings = bookingsData?.filter(b => b.time_slot === time) || [];
-    const maxSlots = 4;
     
     // Get pilot availability slots
     const pilotSlots: (AvailableSlot | UnavailableSlot)[] = availablePilots.map(pilot => {
@@ -364,16 +364,15 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
       return 0;
     });
 
-    // Only include actual pilot slots, no empty filling
+    // Only include actual pilot slots
     let availableSlots: SlotType[] = [...pilotSlots];
-    availableSlots = availableSlots.slice(0, maxSlots);
 
     // Process bookings
     let finalSlots: SlotType[] = [...availableSlots];
     let usedSlots = 0;
 
     for (const booking of timeBookings) {
-      const width = Math.min(booking.number_of_people, maxSlots - usedSlots);
+      const width = booking.number_of_people;
       if (width <= 0) continue;
 
       // Find first available slot
@@ -395,7 +394,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
       // Hide subsequent slots
       for (let i = 1; i < width; i++) {
-        if (availableIndex + i < maxSlots) {
+        if (availableIndex + i < finalSlots.length) {
           const hiddenSlot: HiddenSlot = { type: 'hidden', pilot };
           finalSlots[availableIndex + i] = hiddenSlot;
         }
@@ -407,19 +406,22 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     return finalSlots;
   };
 
-  const getAvailablePilotsCount = (time: string) => {
-    return availabilitiesData?.filter(a => a.time_slot === time).length || 0;
-  };
-
   return (
     <div className="mt-8 overflow-x-auto pb-4">
       <div className="min-w-[1000px]">
-        <div className="grid grid-cols-[120px_1fr] gap-4">
+        <div className="grid" style={{ 
+          gridTemplateColumns: `120px repeat(${availablePilots.length}, 1fr)`,
+          gap: '1rem'
+        }}>
           <div className="font-semibold mb-2">
             Time
           </div>
           
-          <div className="grid grid-cols-4 gap-4">
+          <div className="col-span-full grid" style={{ 
+            gridTemplateColumns: `repeat(${availablePilots.length}, 1fr)`,
+            gap: '1rem',
+            gridColumn: '2'
+          }}>
             {availablePilots.map((pilot) => (
               <div 
                 key={pilot.id}
@@ -436,7 +438,11 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
                 {time}
               </div>
 
-              <div className="grid grid-cols-4 gap-4">
+              <div className="col-span-full grid" style={{ 
+                gridTemplateColumns: `repeat(${availablePilots.length}, 1fr)`,
+                gap: '1rem',
+                gridColumn: '2'
+              }}>
                 {getTimeSlotData(time).map((slot, index) => {
                   if (slot.type === 'hidden' || slot.type === 'empty') return null;
                   
