@@ -1,9 +1,8 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { format, parseISO } from 'date-fns'; // Added parseISO
+import { format, parseISO } from 'date-fns';
 import {
   Dialog,
   DialogContent,
@@ -68,17 +67,9 @@ const EditBookingModal = ({
   booking,
   maxPeople 
 }: EditBookingModalProps) => {
-  // Safely parse the date using parseISO and handle invalid dates
   const [date, setDate] = React.useState<Date | undefined>(() => {
     try {
-      if (booking.booking_date) {
-        const parsedDate = parseISO(booking.booking_date);
-        // Check if the date is valid
-        if (!isNaN(parsedDate.getTime())) {
-          return parsedDate;
-        }
-      }
-      return undefined;
+      return booking.booking_date ? parseISO(booking.booking_date) : undefined;
     } catch (error) {
       console.error('Error parsing date:', error);
       return undefined;
@@ -107,9 +98,6 @@ const EditBookingModal = ({
     }
   });
 
-  const formValues = watch();
-  console.log('EditBookingModal - Current form values:', formValues);
-
   const { data: tags = [] } = useQuery({
     queryKey: ['tags'],
     queryFn: async () => {
@@ -125,10 +113,15 @@ const EditBookingModal = ({
   const handleFormSubmit = async (data: BookingFormData) => {
     console.log('EditBookingModal - handleFormSubmit called with data:', data);
     try {
+      if (!date) {
+        throw new Error('Date is required');
+      }
+      
+      const formattedDate = format(date, 'yyyy-MM-dd');
       await onSubmit({
         ...data,
         id: booking.id,
-        booking_date: date ? format(date, 'yyyy-MM-dd') : booking.booking_date,
+        booking_date: formattedDate,
       });
       console.log('EditBookingModal - onSubmit completed successfully');
       onClose();
@@ -138,15 +131,10 @@ const EditBookingModal = ({
   };
 
   React.useEffect(() => {
-    if (isOpen) {
+    if (isOpen && booking.booking_date) {
       console.log('EditBookingModal - Resetting form with booking:', booking);
       try {
-        if (booking.booking_date) {
-          const parsedDate = parseISO(booking.booking_date);
-          if (!isNaN(parsedDate.getTime())) {
-            setDate(parsedDate);
-          }
-        }
+        setDate(parseISO(booking.booking_date));
       } catch (error) {
         console.error('Error parsing date in useEffect:', error);
       }
@@ -174,19 +162,8 @@ const EditBookingModal = ({
             Make changes to your booking here. Click save when you're done.
           </DialogDescription>
         </DialogHeader>
-        <form 
-          onSubmit={(e) => {
-            console.log('EditBookingModal - Form submit event triggered');
-            handleSubmit(handleFormSubmit)(e);
-          }} 
-          className="space-y-4"
-        >
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
           <input type="hidden" {...register('id')} />
-          <input 
-            type="hidden" 
-            {...register('booking_date')} 
-            value={date ? format(date, 'yyyy-MM-dd') : booking.booking_date}
-          />
           
           <div className="space-y-2">
             <Label>Date</Label>
@@ -196,14 +173,19 @@ const EditBookingModal = ({
                   variant="outline"
                   className="w-full justify-start text-left font-normal"
                 >
-                  {date ? format(date, 'PPP') : <span>Pick a date</span>}
+                  {date ? format(date, 'PPP') : booking.booking_date ? format(parseISO(booking.booking_date), 'PPP') : 'Pick a date'}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
                   mode="single"
                   selected={date}
-                  onSelect={setDate}
+                  onSelect={(newDate) => {
+                    setDate(newDate);
+                    if (newDate) {
+                      setValue('booking_date', format(newDate, 'yyyy-MM-dd'));
+                    }
+                  }}
                   initialFocus
                 />
               </PopoverContent>
@@ -213,11 +195,16 @@ const EditBookingModal = ({
           <div className="space-y-2">
             <Label>Time Slot</Label>
             <Select 
-              onValueChange={(value) => setValue('time_slot', value)}
+              onValueChange={(value) => {
+                console.log('Setting time slot to:', value);
+                setValue('time_slot', value);
+              }}
               defaultValue={booking.time_slot}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a time" />
+                <SelectValue placeholder="Select a time">
+                  {booking.time_slot}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {TIMES.map((time) => (

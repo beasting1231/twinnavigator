@@ -289,6 +289,8 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
           phone: data.phone || null,
           email: data.email || null,
           tag_id: data.tag_id || null,
+          booking_date: data.booking_date,
+          time_slot: data.time_slot,
         })
         .eq('id', data.id);
 
