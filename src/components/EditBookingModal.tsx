@@ -79,15 +79,12 @@ const EditBookingModal = ({
     }
   });
 
-  const handleFormSubmit = (data: BookingFormData) => {
-    console.log('Submitting form with data:', data); // Debug log
-    onSubmit(data);
-    onClose(); // Close the modal after submission
+  const handleFormSubmit = async (data: BookingFormData) => {
+    await onSubmit(data);
   };
 
   React.useEffect(() => {
     if (isOpen) {
-      // Reset form with booking data when modal opens
       reset(booking);
       if (booking.tag_id) {
         setValue('tag_id', booking.tag_id);
@@ -96,7 +93,7 @@ const EditBookingModal = ({
   }, [isOpen, booking, reset, setValue]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="pr-8">Edit Booking</DialogTitle>
@@ -189,11 +186,23 @@ const EditBookingModal = ({
             <Button 
               type="button" 
               variant="destructive"
-              onClick={onDelete}
+              onClick={() => {
+                onDelete();
+                onClose();
+              }}
             >
               Delete Booking
             </Button>
-            <Button type="submit">
+            <Button 
+              type="submit"
+              onClick={async (e) => {
+                e.preventDefault();
+                const result = await handleSubmit(handleFormSubmit)();
+                if (result) {
+                  onClose();
+                }
+              }}
+            >
               Save Changes
             </Button>
           </div>
