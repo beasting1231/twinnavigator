@@ -86,6 +86,20 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
     refetchOnMount: true,
   });
 
+  const { data: bookings = [] } = useQuery({
+    queryKey: ['weekly-bookings', startDate.toISOString()],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('*')
+        .gte('booking_date', DAYS[0].date)
+        .lte('booking_date', DAYS[6].date);
+
+      if (error) throw error;
+      return data;
+    }
+  });
+
   const createAvailability = useMutation({
     mutationFn: async ({ day, timeSlot }: { day: string; timeSlot: string }) => {
       const { error } = await supabase
@@ -189,6 +203,22 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
     },
   });
 
+  const canSetUnavailable = useCallback((day: string, timeSlot: string) => {
+    const booking = bookings.find(b => 
+      b.booking_date === day && 
+      b.time_slot === timeSlot
+    );
+
+    if (!booking) return true;
+
+    const availablePilots = availabilities.filter(a => 
+      a.day === day && 
+      a.time_slot === timeSlot
+    ).length;
+
+    return availablePilots > booking.number_of_people;
+  }, [bookings, availabilities]);
+
   const handleAvailabilityToggle = useCallback((day: string, timeSlot: string) => {
     if (!user?.id) return;
 
@@ -197,11 +227,19 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
     );
 
     if (isCurrentlyAvailable) {
+      if (!canSetUnavailable(day, timeSlot)) {
+        toast({
+          variant: "destructive",
+          title: "Cannot set unavailable",
+          description: "There are not enough pilots available for existing bookings in this time slot.",
+        });
+        return;
+      }
       deleteAvailability.mutate({ day, timeSlot });
     } else {
       createAvailability.mutate({ day, timeSlot });
     }
-  }, [user?.id, availabilities, createAvailability, deleteAvailability]);
+  }, [user?.id, availabilities, createAvailability, deleteAvailability, canSetUnavailable, toast]);
 
   const handleDayToggle = useCallback((day: string) => {
     if (!user?.id) return;
@@ -222,13 +260,21 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
       });
     } else {
       dayAvailabilities.forEach(availability => {
-        deleteAvailability.mutate({ 
-          day: availability.day, 
-          timeSlot: availability.time_slot 
-        });
+        if (canSetUnavailable(day, availability.time_slot)) {
+          deleteAvailability.mutate({ 
+            day: availability.day, 
+            timeSlot: availability.time_slot 
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Cannot set all slots unavailable",
+            description: "Some time slots require your availability for existing bookings.",
+          });
+        }
       });
     }
-  }, [user?.id, availabilities, createAvailability, deleteAvailability, TIMES]);
+  }, [user?.id, availabilities, createAvailability, deleteAvailability, canSetUnavailable, toast]);
 
   const isPilot = profile?.role === 'pilot';
 
