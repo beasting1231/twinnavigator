@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -85,6 +84,8 @@ const EditBookingModal = ({
     }
   });
 
+  const formattedDate = date ? format(date, 'yyyy-MM-dd') : undefined;
+
   const { 
     register, 
     handleSubmit, 
@@ -120,17 +121,17 @@ const EditBookingModal = ({
   });
 
   const { data: availablePilotsForTime = {} } = useQuery({
-    queryKey: ['available-pilots-count', booking.booking_date],
-    enabled: !!booking.booking_date,
+    queryKey: ['available-pilots-count', formattedDate],
+    enabled: !!formattedDate,
     queryFn: async () => {
-      if (!booking.booking_date) {
-        throw new Error('Booking date is required');
+      if (!formattedDate) {
+        throw new Error('Date is required');
       }
 
       const { data: availabilities, error } = await supabase
         .from('pilot_availability')
         .select('time_slot, pilot_id')
-        .eq('day', booking.booking_date);
+        .eq('day', formattedDate);
 
       if (error) throw error;
 
@@ -174,11 +175,11 @@ const EditBookingModal = ({
   });
 
   const { data: availablePilots = [] } = useQuery({
-    queryKey: ['available-pilots', booking.booking_date, selectedTimeSlot],
-    enabled: !!booking.booking_date && !!selectedTimeSlot,
+    queryKey: ['available-pilots', formattedDate, selectedTimeSlot],
+    enabled: !!formattedDate && !!selectedTimeSlot,
     queryFn: async () => {
-      if (!booking.booking_date || !selectedTimeSlot) {
-        throw new Error('Booking date and time slot are required');
+      if (!formattedDate || !selectedTimeSlot) {
+        throw new Error('Date and time slot are required');
       }
 
       const { data: availabilities, error: availabilitiesError } = await supabase
@@ -191,7 +192,7 @@ const EditBookingModal = ({
             gender
           )
         `)
-        .eq('day', booking.booking_date)
+        .eq('day', formattedDate)
         .eq('time_slot', selectedTimeSlot);
 
       if (availabilitiesError) throw availabilitiesError;
@@ -283,7 +284,9 @@ const EditBookingModal = ({
     if (isOpen && booking.booking_date) {
       console.log('EditBookingModal - Resetting form with booking:', booking);
       try {
-        setDate(parseISO(booking.booking_date));
+        const parsedDate = parseISO(booking.booking_date);
+        setDate(parsedDate);
+        setSelectedTimeSlot(booking.time_slot);
       } catch (error) {
         console.error('Error parsing date in useEffect:', error);
       }
@@ -323,7 +326,7 @@ const EditBookingModal = ({
               <input 
                 type="hidden" 
                 {...register('booking_date')} 
-                value={date ? format(date, 'yyyy-MM-dd') : booking.booking_date}
+                value={formattedDate}
               />
               
               <div className="space-y-2">
@@ -473,7 +476,6 @@ const EditBookingModal = ({
                   type="button" 
                   variant="destructive"
                   onClick={() => {
-                    console.log('EditBookingModal - Delete button clicked');
                     onDelete();
                     onClose();
                   }}
