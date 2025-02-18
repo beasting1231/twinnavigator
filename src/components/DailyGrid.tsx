@@ -34,6 +34,9 @@ interface Booking {
   pilot_id: string;
   time_slot: string;
   tag_id: string | null;
+  booking_date: string;
+  phone?: string;
+  email?: string;
   tags?: {
     color: string;
     name: string;
