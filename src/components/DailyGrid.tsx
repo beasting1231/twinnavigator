@@ -179,6 +179,66 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     }
   });
 
+  const getAvailablePilotsCount = (time: string): number => {
+    return availabilitiesData?.filter(a => a.time_slot === time).length || 0;
+  };
+
+  const getTimeSlotData = (time: string): SlotType[] => {
+    const timeBookings = bookingsData?.filter(b => b.time_slot === time) || [];
+    
+    const pilotSlots: (AvailableSlot | UnavailableSlot)[] = availablePilots.map(pilot => {
+      const isAvailable = availabilitiesData?.some(
+        (a: PilotAvailability) => 
+          a.pilot_id === pilot.id && 
+          a.time_slot === time
+      );
+
+      return isAvailable 
+        ? { type: 'available' as const, pilot }
+        : { type: 'unavailable' as const, pilot };
+    });
+
+    pilotSlots.sort((a, b) => {
+      if (a.type === 'available' && b.type === 'unavailable') return -1;
+      if (a.type === 'unavailable' && b.type === 'available') return 1;
+      return 0;
+    });
+
+    let availableSlots: SlotType[] = [...pilotSlots];
+    let finalSlots: SlotType[] = [...availableSlots];
+    let usedSlots = 0;
+
+    for (const booking of timeBookings) {
+      const width = booking.number_of_people;
+      if (width <= 0) continue;
+
+      const availableIndex = finalSlots.findIndex(slot => slot.type === 'available');
+      if (availableIndex === -1) continue;
+
+      const availableSlot = finalSlots[availableIndex] as AvailableSlot;
+      const pilot = availableSlot.pilot;
+
+      const bookingSlot: BookingSlot = {
+        type: 'booking',
+        pilot,
+        booking,
+        width
+      };
+      finalSlots[availableIndex] = bookingSlot;
+
+      for (let i = 1; i < width; i++) {
+        if (availableIndex + i < finalSlots.length) {
+          const hiddenSlot: HiddenSlot = { type: 'hidden', pilot };
+          finalSlots[availableIndex + i] = hiddenSlot;
+        }
+      }
+
+      usedSlots += width;
+    }
+
+    return finalSlots;
+  };
+
   const createBooking = useMutation({
     mutationFn: async (data: BookingFormData & { pilotId: string, date: string, timeSlot: string }) => {
       const { error } = await supabase
@@ -340,67 +400,6 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
   const selectedDay = format(selectedDate, "EEEE MMM d").toUpperCase();
 
-  const getTimeSlotData = (time: string): SlotType[] => {
-    const timeBookings = bookingsData?.filter(b => b.time_slot === time) || [];
-    
-    const pilotSlots: (AvailableSlot | UnavailableSlot)[] = availablePilots.map(pilot => {
-      const isAvailable = availabilitiesData?.some(
-        (a: PilotAvailability) => 
-          a.pilot_id === pilot.id && 
-          a.time_slot === time
-      );
-
-      return isAvailable 
-        ? { type: 'available' as const, pilot }
-        : { type: 'unavailable' as const, pilot };
-    });
-
-    pilotSlots.sort((a, b) => {
-      if (a.type === 'available' && b.type === 'unavailable') return -1;
-      if (a.type === 'unavailable' && b.type === 'available') return 1;
-      return 0;
-    });
-
-    let availableSlots: SlotType[] = [...pilotSlots];
-
-    let finalSlots: SlotType[] = [...availableSlots];
-    let usedSlots = 0;
-
-    for (const booking of timeBookings) {
-      const width = booking.number_of_people;
-      if (width <= 0) continue;
-
-      const availableIndex = finalSlots.findIndex(slot => slot.type === 'available');
-      if (availableIndex === -1) continue;
-
-      const availableSlot = finalSlots[availableIndex] as AvailableSlot;
-      const pilot = availableSlot.pilot;
-
-      const bookingSlot: BookingSlot = {
-        type: 'booking',
-        pilot,
-        booking,
-        width
-      };
-      finalSlots[availableIndex] = bookingSlot;
-
-      for (let i = 1; i < width; i++) {
-        if (availableIndex + i < finalSlots.length) {
-          const hiddenSlot: HiddenSlot = { type: 'hidden', pilot };
-          finalSlots[availableIndex + i] = hiddenSlot;
-        }
-      }
-
-      usedSlots += width;
-    }
-
-    return finalSlots;
-  };
-
-  const getAvailablePilotsCount = (time: string) => {
-    return availabilitiesData?.filter(a => a.time_slot === time).length || 0;
-  };
-
   return (
     <div className="mt-8 overflow-x-auto pb-4">
       <div className="min-w-[1000px]">
@@ -509,7 +508,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
           onSubmit={handleUpdateBooking}
           onDelete={handleDeleteBooking}
           booking={selectedBooking}
-          maxPeople={4}
+          maxPeople={getAvailablePilotsCount(selectedBooking.time_slot)}
         />
       )}
     </div>
