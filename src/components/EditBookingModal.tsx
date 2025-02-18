@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -117,11 +118,13 @@ const EditBookingModal = ({
       
       const updatedData = {
         ...data,
+        id: booking.id, // Make sure to include the ID
         booking_date: formattedDate,
       };
       
       console.log('EditBookingModal - Submitting with updatedData:', updatedData);
       await onSubmit(updatedData);
+      onClose(); // Close the modal after successful submission
     } catch (error) {
       console.error('EditBookingModal - Error submitting form:', error);
     }
@@ -159,8 +162,19 @@ const EditBookingModal = ({
             Make changes to your booking here. Click save when you're done.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+        <form 
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSubmit(handleFormSubmit)(e);
+          }} 
+          className="space-y-4"
+        >
           <input type="hidden" {...register('id')} />
+          <input 
+            type="hidden" 
+            {...register('booking_date')} 
+            value={date ? format(date, 'yyyy-MM-dd') : booking.booking_date}
+          />
           
           <div className="space-y-2">
             <Label>Date</Label>
