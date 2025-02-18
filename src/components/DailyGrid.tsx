@@ -414,7 +414,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     <div className="mt-8 overflow-x-auto pb-4">
       <div className="min-w-[1000px]">
         <div className="grid" style={{ 
-          gridTemplateColumns: `120px repeat(${availablePilots.length}, minmax(200px, 1fr))`,
+          gridTemplateColumns: `120px ${availablePilots.map(() => 'minmax(180px, 180px)').join(' ')}`,
           gap: '1rem'
         }}>
           <div className="font-semibold mb-2">
@@ -424,7 +424,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
           {availablePilots.map((pilot) => (
             <div 
               key={pilot.id}
-              className="text-center font-semibold mb-2"
+              className="text-center font-semibold mb-2 w-[180px]"
             >
               <div>{pilot.name}</div>
             </div>
@@ -444,6 +444,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
                     key={index} 
                     className="h-[50px] relative"
                     style={{
+                      width: slot.type === 'booking' ? `calc(${slot.width * 180}px + ${(slot.width - 1) * 1}rem)`,
                       gridColumn: slot.type === 'booking' ? `span ${slot.width}` : undefined
                     }}
                   >
@@ -460,21 +461,21 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
                           {slot.booking.number_of_people}
                         </div>
                         <div className="flex flex-col text-white text-xs">
-                          <span className="font-medium">{slot.booking.name}</span>
-                          <span>{slot.booking.pickup_location}</span>
+                          <span className="font-medium truncate">{slot.booking.name}</span>
+                          <span className="truncate">{slot.booking.pickup_location}</span>
                         </div>
                       </div>
                     )}
                     {slot.type === 'available' && (
                       <div 
-                        className="bg-white rounded-lg p-2 text-sm font-medium text-center h-full cursor-pointer hover:bg-gray-50"
+                        className="bg-white rounded-lg p-2 text-sm font-medium text-center h-full cursor-pointer hover:bg-gray-50 w-[180px]"
                         onClick={() => setSelectedSlot({ time, pilotId: slot.pilot.id })}
                       >
                         Available
                       </div>
                     )}
                     {slot.type === 'unavailable' && (
-                      <div className="bg-gray-700 rounded-lg p-2 text-sm font-medium text-center text-white h-full">
+                      <div className="bg-gray-700 rounded-lg p-2 text-sm font-medium text-center text-white h-full w-[180px]">
                         No {slot.pilot.name}
                       </div>
                     )}
