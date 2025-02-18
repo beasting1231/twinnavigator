@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -29,6 +28,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { BookingFormData } from './BookingModal';
+import { useToast } from "@/components/ui/use-toast";
 
 const TIMES = ["7:30", "8:30", "9:45", "11:00", "12:30", "14:00", "15:30", "16:45"];
 
@@ -72,6 +72,8 @@ const EditBookingModal = ({
   maxPeople 
 }: EditBookingModalProps) => {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [selectedTimeSlot, setSelectedTimeSlot] = React.useState(booking.time_slot);
   
   const [date, setDate] = React.useState<Date | undefined>(() => {
     try {
@@ -116,7 +118,6 @@ const EditBookingModal = ({
     }
   });
 
-  // First query to get the assigned pilot IDs
   const { data: assignedPilotIds = [] } = useQuery({
     queryKey: ['assigned-pilot-ids', booking.id],
     queryFn: async () => {
@@ -130,7 +131,6 @@ const EditBookingModal = ({
     }
   });
 
-  // Second query to get the pilot details
   const { data: assignedPilots = [] } = useQuery({
     queryKey: ['assigned-pilots', assignedPilotIds],
     enabled: assignedPilotIds.length > 0,
@@ -147,8 +147,27 @@ const EditBookingModal = ({
     }
   });
 
+  const { data: availablePilotsForTime = {} } = useQuery({
+    queryKey: ['available-pilots-count', booking.booking_date],
+    queryFn: async () => {
+      const { data: availabilities, error } = await supabase
+        .from('pilot_availability')
+        .select('time_slot, pilot_id')
+        .eq('day', booking.booking_date);
+
+      if (error) throw error;
+
+      const pilotCounts: Record<string, number> = {};
+      availabilities?.forEach(availability => {
+        pilotCounts[availability.time_slot] = (pilotCounts[availability.time_slot] || 0) + 1;
+      });
+
+      return pilotCounts;
+    }
+  });
+
   const { data: availablePilots = [] } = useQuery({
-    queryKey: ['available-pilots', booking.booking_date, booking.time_slot],
+    queryKey: ['available-pilots', booking.booking_date, selectedTimeSlot],
     queryFn: async () => {
       const { data: availabilities, error: availabilitiesError } = await supabase
         .from('pilot_availability')
@@ -161,7 +180,7 @@ const EditBookingModal = ({
           )
         `)
         .eq('day', booking.booking_date)
-        .eq('time_slot', booking.time_slot);
+        .eq('time_slot', selectedTimeSlot);
 
       if (availabilitiesError) throw availabilitiesError;
       
@@ -173,6 +192,22 @@ const EditBookingModal = ({
         );
     }
   });
+
+  const handleTimeSlotChange = (value: string) => {
+    const availablePilotsCount = availablePilotsForTime[value] || 0;
+    
+    if (availablePilotsCount < booking.number_of_people) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Time Slot",
+        description: `This time slot only has ${availablePilotsCount} pilot${availablePilotsCount === 1 ? '' : 's'} available. You need ${booking.number_of_people}.`,
+      });
+      return;
+    }
+
+    setSelectedTimeSlot(value);
+    setValue('time_slot', value);
+  };
 
   const handleFormSubmit = async (data: BookingFormData) => {
     console.log('EditBookingModal - handleFormSubmit called with data:', data);
@@ -310,10 +345,7 @@ const EditBookingModal = ({
               <div className="space-y-2">
                 <Label>Time Slot</Label>
                 <Select 
-                  onValueChange={(value) => {
-                    console.log('Setting time slot to:', value);
-                    setValue('time_slot', value);
-                  }}
+                  onValueChange={handleTimeSlotChange}
                   defaultValue={booking.time_slot}
                 >
                   <SelectTrigger>
@@ -322,11 +354,21 @@ const EditBookingModal = ({
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {TIMES.map((time) => (
-                      <SelectItem key={time} value={time}>
-                        {time}
-                      </SelectItem>
-                    ))}
+                    {TIMES.map((time) => {
+                      const availableCount = availablePilotsForTime[time] || 0;
+                      const isDisabled = availableCount < booking.number_of_people;
+                      
+                      return (
+                        <SelectItem 
+                          key={time} 
+                          value={time}
+                          disabled={isDisabled}
+                          className={isDisabled ? 'opacity-50' : ''}
+                        >
+                          {time} ({availableCount} {availableCount === 1 ? 'pilot' : 'pilots'})
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
