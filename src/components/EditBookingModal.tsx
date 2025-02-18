@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -80,7 +79,12 @@ const EditBookingModal = ({
   });
 
   const handleFormSubmit = async (data: BookingFormData) => {
-    await onSubmit(data);
+    try {
+      await onSubmit(data);
+      onClose();
+    } catch (error) {
+      console.error('Error submitting form:', error);
+    }
   };
 
   React.useEffect(() => {
@@ -193,18 +197,7 @@ const EditBookingModal = ({
             >
               Delete Booking
             </Button>
-            <Button 
-              type="submit"
-              onClick={async (e) => {
-                e.preventDefault();
-                try {
-                  await handleSubmit(handleFormSubmit)(e);
-                  onClose();
-                } catch (error) {
-                  console.error('Error submitting form:', error);
-                }
-              }}
-            >
+            <Button type="submit">
               Save Changes
             </Button>
           </div>
