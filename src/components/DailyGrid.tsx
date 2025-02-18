@@ -404,27 +404,21 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     <div className="mt-8 overflow-x-auto pb-4">
       <div className="min-w-[1000px]">
         <div className="grid" style={{ 
-          gridTemplateColumns: `120px repeat(${availablePilots.length}, 1fr)`,
+          gridTemplateColumns: `120px repeat(${availablePilots.length}, minmax(200px, 1fr))`,
           gap: '1rem'
         }}>
           <div className="font-semibold mb-2">
             Time
           </div>
           
-          <div className="col-span-full grid" style={{ 
-            gridTemplateColumns: `repeat(${availablePilots.length}, 1fr)`,
-            gap: '1rem',
-            gridColumn: '2'
-          }}>
-            {availablePilots.map((pilot) => (
-              <div 
-                key={pilot.id}
-                className="text-center font-semibold mb-2"
-              >
-                <div>{pilot.name}</div>
-              </div>
-            ))}
-          </div>
+          {availablePilots.map((pilot) => (
+            <div 
+              key={pilot.id}
+              className="text-center font-semibold mb-2"
+            >
+              <div>{pilot.name}</div>
+            </div>
+          ))}
 
           {TIMES.map((time) => (
             <React.Fragment key={time}>
@@ -432,57 +426,51 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
                 {time}
               </div>
 
-              <div className="col-span-full grid" style={{ 
-                gridTemplateColumns: `repeat(${availablePilots.length}, 1fr)`,
-                gap: '1rem',
-                gridColumn: '2'
-              }}>
-                {getTimeSlotData(time).map((slot, index) => {
-                  if (slot.type === 'hidden' || slot.type === 'empty') return null;
-                  
-                  return (
-                    <div 
-                      key={index} 
-                      className="h-[50px] relative"
-                      style={{
-                        gridColumn: slot.type === 'booking' ? `span ${slot.width}` : undefined
-                      }}
-                    >
-                      {slot.type === 'booking' && (
-                        <div 
-                          className="rounded-lg p-2 text-sm font-medium h-full cursor-pointer hover:opacity-90"
-                          style={{ 
-                            backgroundColor: slot.booking.tags?.color || '#1EAEDB',
-                            width: '100%'
-                          }}
-                          onClick={() => setSelectedBooking(slot.booking)}
-                        >
-                          <div className="absolute top-1 right-1 bg-gray-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
-                            {slot.booking.number_of_people}
-                          </div>
-                          <div className="flex flex-col text-white text-xs">
-                            <span className="font-medium">{slot.booking.name}</span>
-                            <span>{slot.booking.pickup_location}</span>
-                          </div>
+              {getTimeSlotData(time).map((slot, index) => {
+                if (slot.type === 'hidden' || slot.type === 'empty') return null;
+                
+                return (
+                  <div 
+                    key={index} 
+                    className="h-[50px] relative"
+                    style={{
+                      gridColumn: slot.type === 'booking' ? `span ${slot.width}` : undefined
+                    }}
+                  >
+                    {slot.type === 'booking' && (
+                      <div 
+                        className="rounded-lg p-2 text-sm font-medium h-full cursor-pointer hover:opacity-90"
+                        style={{ 
+                          backgroundColor: slot.booking.tags?.color || '#1EAEDB',
+                          width: '100%'
+                        }}
+                        onClick={() => setSelectedBooking(slot.booking)}
+                      >
+                        <div className="absolute top-1 right-1 bg-gray-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
+                          {slot.booking.number_of_people}
                         </div>
-                      )}
-                      {slot.type === 'available' && (
-                        <div 
-                          className="bg-white rounded-lg p-2 text-sm font-medium text-center h-full cursor-pointer hover:bg-gray-50"
-                          onClick={() => setSelectedSlot({ time, pilotId: slot.pilot.id })}
-                        >
-                          Available
+                        <div className="flex flex-col text-white text-xs">
+                          <span className="font-medium">{slot.booking.name}</span>
+                          <span>{slot.booking.pickup_location}</span>
                         </div>
-                      )}
-                      {slot.type === 'unavailable' && (
-                        <div className="bg-gray-700 rounded-lg p-2 text-sm font-medium text-center text-white h-full">
-                          No {slot.pilot.name}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                      </div>
+                    )}
+                    {slot.type === 'available' && (
+                      <div 
+                        className="bg-white rounded-lg p-2 text-sm font-medium text-center h-full cursor-pointer hover:bg-gray-50"
+                        onClick={() => setSelectedSlot({ time, pilotId: slot.pilot.id })}
+                      >
+                        Available
+                      </div>
+                    )}
+                    {slot.type === 'unavailable' && (
+                      <div className="bg-gray-700 rounded-lg p-2 text-sm font-medium text-center text-white h-full">
+                        No {slot.pilot.name}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </React.Fragment>
           ))}
         </div>
