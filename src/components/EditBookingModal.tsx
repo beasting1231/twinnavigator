@@ -80,18 +80,23 @@ const EditBookingModal = ({
   });
 
   const handleFormSubmit = (data: BookingFormData) => {
+    console.log('Submitting form with data:', data); // Debug log
     onSubmit(data);
-    reset();
+    onClose(); // Close the modal after submission
   };
 
   React.useEffect(() => {
-    if (!isOpen) {
-      reset();
+    if (isOpen) {
+      // Reset form with booking data when modal opens
+      reset(booking);
+      if (booking.tag_id) {
+        setValue('tag_id', booking.tag_id);
+      }
     }
-  }, [isOpen, reset]);
+  }, [isOpen, booking, reset, setValue]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => onClose()}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="pr-8">Edit Booking</DialogTitle>
