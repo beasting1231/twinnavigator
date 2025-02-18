@@ -275,8 +275,8 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
   const updateBooking = useMutation({
     mutationFn: async (data: BookingFormData & { id: string }) => {
-      console.log('Updating booking with data:', data); // Debug log
-
+      console.log('DailyGrid - Starting mutation with data:', data);
+      
       const { error } = await supabase
         .from('bookings')
         .update({
@@ -290,27 +290,24 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         .eq('id', data.id);
 
       if (error) {
-        console.error('Error updating booking:', error); // Debug log
+        console.error('DailyGrid - Supabase update error:', error);
         throw error;
       }
 
+      console.log('DailyGrid - Supabase update successful');
       return data;
     },
     onSuccess: (updatedData) => {
-      console.log('Update successful:', updatedData); // Debug log
-      
+      console.log('DailyGrid - Mutation onSuccess with data:', updatedData);
       queryClient.invalidateQueries({ queryKey: ['bookings', formattedDate] });
-
       toast({
         title: "Success",
         description: "Booking updated successfully",
       });
-      
       setSelectedBooking(null);
     },
     onError: (error) => {
-      console.error('Update error:', error); // Debug log
-      
+      console.error('DailyGrid - Mutation onError:', error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -360,11 +357,14 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
   const handleUpdateBooking = async (data: BookingFormData) => {
     if (!selectedBooking) {
-      console.error('No booking selected for update'); // Debug log
+      console.error('DailyGrid - No booking selected for update');
       return;
     }
     
-    console.log('Handling booking update:', { data, bookingId: selectedBooking.id }); // Debug log
+    console.log('DailyGrid - handleUpdateBooking called with:', {
+      formData: data,
+      selectedBooking,
+    });
     
     await updateBooking.mutate({
       ...data,

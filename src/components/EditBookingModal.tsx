@@ -79,11 +79,14 @@ const EditBookingModal = ({
   });
 
   const handleFormSubmit = async (data: BookingFormData) => {
+    console.log('EditBookingModal - Form Data before submission:', data);
     try {
+      console.log('EditBookingModal - Calling onSubmit with data');
       await onSubmit(data);
+      console.log('EditBookingModal - onSubmit completed successfully');
       onClose();
     } catch (error) {
-      console.error('Error submitting form:', error);
+      console.error('EditBookingModal - Error submitting form:', error);
     }
   };
 
