@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { format } from "date-fns";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -410,13 +411,18 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
   const selectedDay = format(selectedDate, "EEEE MMM d").toUpperCase();
 
+  const gridColumns = `120px ${availablePilots.map(() => 'minmax(180px, 180px)').join(' ')}`;
+
   return (
     <div className="mt-8 overflow-x-auto pb-4">
       <div className="min-w-[1000px]">
-        <div className="grid" style={{ 
-          gridTemplateColumns: `120px ${availablePilots.map(() => 'minmax(180px, 180px)').join(' ')}`,
-          gap: '1rem'
-        }}>
+        <div 
+          className="grid" 
+          style={{ 
+            gridTemplateColumns: gridColumns,
+            gap: '1rem'
+          }}
+        >
           <div className="font-semibold mb-2">
             Time
           </div>
@@ -439,12 +445,16 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
               {getTimeSlotData(time).map((slot, index) => {
                 if (slot.type === 'hidden' || slot.type === 'empty') return null;
                 
+                const slotWidth = slot.type === 'booking' 
+                  ? `calc(${slot.width * 180}px + ${(slot.width - 1) * 1}rem)`
+                  : undefined;
+                
                 return (
                   <div 
                     key={index} 
                     className="h-[50px] relative"
                     style={{
-                      width: slot.type === 'booking' ? `calc(${slot.width * 180}px + ${(slot.width - 1) * 1}rem)`,
+                      width: slotWidth,
                       gridColumn: slot.type === 'booking' ? `span ${slot.width}` : undefined
                     }}
                   >
