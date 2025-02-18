@@ -3,6 +3,7 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { format } from 'date-fns';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +11,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -20,9 +22,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { BookingFormData } from './BookingModal';
+
+const TIMES = ["7:30", "8:30", "9:45", "11:00", "12:30", "14:00", "15:30", "16:45"];
 
 interface EditBookingModalProps {
   isOpen: boolean;
@@ -37,6 +42,8 @@ interface EditBookingModalProps {
     phone?: string;
     email?: string;
     tag_id?: string;
+    booking_date: string;
+    time_slot: string;
   };
   maxPeople: number;
 }
@@ -49,6 +56,8 @@ const bookingSchema = z.object({
   phone: z.string().optional(),
   email: z.string().email().optional().or(z.literal("")),
   tag_id: z.string().optional(),
+  booking_date: z.string(),
+  time_slot: z.string(),
 });
 
 const EditBookingModal = ({ 
@@ -59,7 +68,9 @@ const EditBookingModal = ({
   booking,
   maxPeople 
 }: EditBookingModalProps) => {
-  console.log('EditBookingModal - Rendering with booking:', booking);
+  const [date, setDate] = React.useState<Date | undefined>(
+    booking.booking_date ? new Date(booking.booking_date) : undefined
+  );
 
   const { 
     register, 
@@ -78,10 +89,11 @@ const EditBookingModal = ({
       phone: booking.phone || '',
       email: booking.email || '',
       tag_id: booking.tag_id || '',
+      booking_date: booking.booking_date,
+      time_slot: booking.time_slot,
     }
   });
 
-  // Watch form values for debugging
   const formValues = watch();
   console.log('EditBookingModal - Current form values:', formValues);
 
@@ -103,6 +115,7 @@ const EditBookingModal = ({
       await onSubmit({
         ...data,
         id: booking.id,
+        booking_date: date ? format(date, 'yyyy-MM-dd') : booking.booking_date,
       });
       console.log('EditBookingModal - onSubmit completed successfully');
       onClose();
@@ -114,6 +127,7 @@ const EditBookingModal = ({
   React.useEffect(() => {
     if (isOpen) {
       console.log('EditBookingModal - Resetting form with booking:', booking);
+      setDate(new Date(booking.booking_date));
       reset({
         id: booking.id,
         name: booking.name,
@@ -122,6 +136,8 @@ const EditBookingModal = ({
         phone: booking.phone || '',
         email: booking.email || '',
         tag_id: booking.tag_id || '',
+        booking_date: booking.booking_date,
+        time_slot: booking.time_slot,
       });
     }
   }, [isOpen, booking, reset]);
@@ -142,9 +158,54 @@ const EditBookingModal = ({
           }} 
           className="space-y-4"
         >
-          {/* Hidden input for id */}
           <input type="hidden" {...register('id')} />
+          <input 
+            type="hidden" 
+            {...register('booking_date')} 
+            value={date ? format(date, 'yyyy-MM-dd') : booking.booking_date}
+          />
           
+          <div className="space-y-2">
+            <Label>Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-left font-normal"
+                >
+                  {date ? format(date, 'PPP') : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={setDate}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Time Slot</Label>
+            <Select 
+              onValueChange={(value) => setValue('time_slot', value)}
+              defaultValue={booking.time_slot}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a time" />
+              </SelectTrigger>
+              <SelectContent>
+                {TIMES.map((time) => (
+                  <SelectItem key={time} value={time}>
+                    {time}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div>
             <Label htmlFor="name">Name *</Label>
             <Input
@@ -243,10 +304,7 @@ const EditBookingModal = ({
             >
               Delete Booking
             </Button>
-            <Button 
-              type="submit"
-              onClick={() => console.log('EditBookingModal - Submit button clicked')}
-            >
+            <Button type="submit">
               Save Changes
             </Button>
           </div>

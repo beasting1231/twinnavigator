@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -32,13 +31,15 @@ interface BookingModalProps {
 }
 
 export interface BookingFormData {
-  id?: string;  // Adding id as optional since it's only needed for updates
+  id?: string;
   name: string;
   pickup_location: string;
   number_of_people: number;
   phone?: string;
   email?: string;
   tag_id?: string;
+  booking_date?: string;
+  time_slot?: string;
 }
 
 const bookingSchema = z.object({
