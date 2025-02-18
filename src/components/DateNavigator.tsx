@@ -7,7 +7,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { format, addWeeks, subWeeks } from "date-fns";
+import { format, addDays, subDays, addWeeks, subWeeks } from "date-fns";
+import { useLocation } from "react-router-dom";
 
 interface DateNavigatorProps {
   date: Date;
@@ -15,10 +16,13 @@ interface DateNavigatorProps {
 }
 
 const DateNavigator = ({ date, onDateChange }: DateNavigatorProps) => {
-  const navigateWeek = (direction: 'prev' | 'next') => {
-    const newDate = direction === 'next' 
-      ? addWeeks(date, 1)
-      : subWeeks(date, 1);
+  const location = useLocation();
+  const isDailyPlan = location.pathname.includes('daily-plan');
+
+  const navigateDate = (direction: 'prev' | 'next') => {
+    const newDate = isDailyPlan
+      ? (direction === 'next' ? addDays(date, 1) : subDays(date, 1))
+      : (direction === 'next' ? addWeeks(date, 1) : subWeeks(date, 1));
     onDateChange(newDate);
   };
 
@@ -27,7 +31,7 @@ const DateNavigator = ({ date, onDateChange }: DateNavigatorProps) => {
       <Button
         variant="outline"
         size="icon"
-        onClick={() => navigateWeek('prev')}
+        onClick={() => navigateDate('prev')}
         className="h-8 w-8"
       >
         <ChevronLeft className="h-4 w-4" />
@@ -56,7 +60,7 @@ const DateNavigator = ({ date, onDateChange }: DateNavigatorProps) => {
       <Button
         variant="outline"
         size="icon"
-        onClick={() => navigateWeek('next')}
+        onClick={() => navigateDate('next')}
         className="h-8 w-8"
       >
         <ChevronRight className="h-4 w-4" />
