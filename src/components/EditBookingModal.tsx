@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -115,8 +116,9 @@ const EditBookingModal = ({
     }
   });
 
+  // First query to get the assigned pilot IDs
   const { data: assignedPilotIds = [] } = useQuery({
-    queryKey: ['pilot-assignment-ids', booking.id],
+    queryKey: ['assigned-pilot-ids', booking.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pilot_assignments')
@@ -124,14 +126,17 @@ const EditBookingModal = ({
         .eq('booking_id', booking.id);
 
       if (error) throw error;
-      return data?.map(d => d.pilot_id) || [];
+      return (data || []).map(d => d.pilot_id);
     }
   });
 
+  // Second query to get the pilot details
   const { data: assignedPilots = [] } = useQuery({
     queryKey: ['assigned-pilots', assignedPilotIds],
     enabled: assignedPilotIds.length > 0,
     queryFn: async () => {
+      if (assignedPilotIds.length === 0) return [];
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('id, username, gender')
@@ -192,15 +197,15 @@ const EditBookingModal = ({
     try {
       const { error } = await supabase
         .from('pilot_assignments')
-        .insert([{ 
+        .upsert([{ 
           booking_id: booking.id, 
-          pilot_id: pilotId 
+          pilot_id: pilotId,
         }]);
 
       if (error) throw error;
       
       queryClient.invalidateQueries({ 
-        queryKey: ['pilot-assignment-ids', booking.id] 
+        queryKey: ['assigned-pilot-ids', booking.id] 
       });
     } catch (error) {
       console.error('Error assigning pilot:', error);
@@ -212,13 +217,15 @@ const EditBookingModal = ({
       const { error } = await supabase
         .from('pilot_assignments')
         .delete()
-        .eq('booking_id', booking.id)
-        .eq('pilot_id', pilotId);
+        .match({ 
+          booking_id: booking.id,
+          pilot_id: pilotId 
+        });
 
       if (error) throw error;
       
       queryClient.invalidateQueries({ 
-        queryKey: ['pilot-assignment-ids', booking.id] 
+        queryKey: ['assigned-pilot-ids', booking.id] 
       });
     } catch (error) {
       console.error('Error unassigning pilot:', error);

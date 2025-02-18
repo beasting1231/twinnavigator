@@ -66,6 +66,42 @@ export type Database = {
           },
         ]
       }
+      pilot_assignments: {
+        Row: {
+          booking_id: string | null
+          created_at: string
+          id: string
+          pilot_id: string | null
+        }
+        Insert: {
+          booking_id?: string | null
+          created_at?: string
+          id?: string
+          pilot_id?: string | null
+        }
+        Update: {
+          booking_id?: string | null
+          created_at?: string
+          id?: string
+          pilot_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pilot_assignments_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pilot_assignments_pilot_id_fkey"
+            columns: ["pilot_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pilot_availability: {
         Row: {
           created_at: string
