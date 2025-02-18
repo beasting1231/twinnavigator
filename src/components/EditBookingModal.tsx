@@ -113,18 +113,15 @@ const EditBookingModal = ({
   const handleFormSubmit = async (data: BookingFormData) => {
     console.log('EditBookingModal - handleFormSubmit called with data:', data);
     try {
-      if (!date) {
-        throw new Error('Date is required');
-      }
+      const formattedDate = date ? format(date, 'yyyy-MM-dd') : booking.booking_date;
       
-      const formattedDate = format(date, 'yyyy-MM-dd');
-      await onSubmit({
+      const updatedData = {
         ...data,
-        id: booking.id,
         booking_date: formattedDate,
-      });
-      console.log('EditBookingModal - onSubmit completed successfully');
-      onClose();
+      };
+      
+      console.log('EditBookingModal - Submitting with updatedData:', updatedData);
+      await onSubmit(updatedData);
     } catch (error) {
       console.error('EditBookingModal - Error submitting form:', error);
     }
@@ -172,6 +169,7 @@ const EditBookingModal = ({
                 <Button
                   variant="outline"
                   className="w-full justify-start text-left font-normal"
+                  type="button"
                 >
                   {date ? format(date, 'PPP') : booking.booking_date ? format(parseISO(booking.booking_date), 'PPP') : 'Pick a date'}
                 </Button>
@@ -202,8 +200,8 @@ const EditBookingModal = ({
               defaultValue={booking.time_slot}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a time">
-                  {booking.time_slot}
+                <SelectValue>
+                  {watch('time_slot')}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -283,11 +281,8 @@ const EditBookingModal = ({
           <div>
             <Label htmlFor="tag">Tag</Label>
             <Select 
-              onValueChange={(value) => {
-                console.log('EditBookingModal - Tag selected:', value);
-                setValue('tag_id', value);
-              }}
-              defaultValue={booking.tag_id}
+              onValueChange={(value) => setValue('tag_id', value)}
+              defaultValue={booking.tag_id || undefined}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select a tag" />
