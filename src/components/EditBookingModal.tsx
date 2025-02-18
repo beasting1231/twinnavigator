@@ -3,7 +3,7 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns'; // Added parseISO
 import {
   Dialog,
   DialogContent,
@@ -68,9 +68,22 @@ const EditBookingModal = ({
   booking,
   maxPeople 
 }: EditBookingModalProps) => {
-  const [date, setDate] = React.useState<Date | undefined>(
-    booking.booking_date ? new Date(booking.booking_date) : undefined
-  );
+  // Safely parse the date using parseISO and handle invalid dates
+  const [date, setDate] = React.useState<Date | undefined>(() => {
+    try {
+      if (booking.booking_date) {
+        const parsedDate = parseISO(booking.booking_date);
+        // Check if the date is valid
+        if (!isNaN(parsedDate.getTime())) {
+          return parsedDate;
+        }
+      }
+      return undefined;
+    } catch (error) {
+      console.error('Error parsing date:', error);
+      return undefined;
+    }
+  });
 
   const { 
     register, 
@@ -127,7 +140,17 @@ const EditBookingModal = ({
   React.useEffect(() => {
     if (isOpen) {
       console.log('EditBookingModal - Resetting form with booking:', booking);
-      setDate(new Date(booking.booking_date));
+      try {
+        if (booking.booking_date) {
+          const parsedDate = parseISO(booking.booking_date);
+          if (!isNaN(parsedDate.getTime())) {
+            setDate(parsedDate);
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing date in useEffect:', error);
+      }
+
       reset({
         id: booking.id,
         name: booking.name,
