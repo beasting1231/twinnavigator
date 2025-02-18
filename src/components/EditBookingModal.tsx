@@ -244,6 +244,61 @@ const EditBookingModal = ({
     }
   };
 
+  const handlePilotAssignment = async (pilotId: string) => {
+    try {
+      const { error } = await supabase
+        .from('pilot_assignments')
+        .insert({
+          booking_id: booking.id,
+          pilot_id: pilotId
+        });
+
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['assigned-pilot-ids', booking.id] });
+      queryClient.invalidateQueries({ queryKey: ['assigned-pilots'] });
+      
+      toast({
+        title: "Success",
+        description: "Pilot assigned successfully",
+      });
+    } catch (error) {
+      console.error('Error assigning pilot:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to assign pilot",
+      });
+    }
+  };
+
+  const handlePilotUnassignment = async (pilotId: string) => {
+    try {
+      const { error } = await supabase
+        .from('pilot_assignments')
+        .delete()
+        .eq('booking_id', booking.id)
+        .eq('pilot_id', pilotId);
+
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['assigned-pilot-ids', booking.id] });
+      queryClient.invalidateQueries({ queryKey: ['assigned-pilots'] });
+      
+      toast({
+        title: "Success",
+        description: "Pilot unassigned successfully",
+      });
+    } catch (error) {
+      console.error('Error unassigning pilot:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to unassign pilot",
+      });
+    }
+  };
+
   React.useEffect(() => {
     if (isOpen && booking.booking_date) {
       console.log('EditBookingModal - Resetting form with booking:', booking);
