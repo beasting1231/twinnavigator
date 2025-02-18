@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -72,6 +71,7 @@ const EditBookingModal = ({
   maxPeople 
 }: EditBookingModalProps) => {
   const queryClient = useQueryClient();
+  
   const [date, setDate] = React.useState<Date | undefined>(() => {
     try {
       return booking.booking_date ? parseISO(booking.booking_date) : undefined;
@@ -115,6 +115,33 @@ const EditBookingModal = ({
     }
   });
 
+  const { data: assignedPilotIds = [] } = useQuery({
+    queryKey: ['pilot-assignment-ids', booking.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pilot_assignments')
+        .select('pilot_id')
+        .eq('booking_id', booking.id);
+
+      if (error) throw error;
+      return data?.map(d => d.pilot_id) || [];
+    }
+  });
+
+  const { data: assignedPilots = [] } = useQuery({
+    queryKey: ['assigned-pilots', assignedPilotIds],
+    enabled: assignedPilotIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, gender')
+        .in('id', assignedPilotIds);
+
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
   const { data: availablePilots = [] } = useQuery({
     queryKey: ['available-pilots', booking.booking_date, booking.time_slot],
     queryFn: async () => {
@@ -133,34 +160,12 @@ const EditBookingModal = ({
 
       if (availabilitiesError) throw availabilitiesError;
       
-      // Remove duplicates and null profiles
       return availabilities
         .filter(a => a.profiles)
-        .reduce((acc: any[], curr) => {
-          if (!acc.find(p => p.id === curr.profiles.id)) {
-            acc.push(curr.profiles);
-          }
-          return acc;
-        }, []);
-    }
-  });
-
-  const { data: assignedPilots = [] } = useQuery({
-    queryKey: ['pilot-assignments', booking.id],
-    queryFn: async () => {
-      const { data: assignments, error } = await supabase
-        .from('profiles')
-        .select('id, username, gender')
-        .in('id', 
-          supabase
-            .from('pilot_assignments')
-            .select('pilot_id')
-            .eq('booking_id', booking.id)
-            .then(result => (result.data || []).map(a => a.pilot_id))
+        .map(a => a.profiles)
+        .filter((pilot, index, self) => 
+          index === self.findIndex(p => p.id === pilot.id)
         );
-
-      if (error) throw error;
-      return assignments || [];
     }
   });
 
@@ -185,13 +190,18 @@ const EditBookingModal = ({
 
   const handlePilotAssignment = async (pilotId: string) => {
     try {
-      await supabase
+      const { error } = await supabase
         .from('pilot_assignments')
-        .insert([
-          { booking_id: booking.id, pilot_id: pilotId }
-        ]);
+        .insert([{ 
+          booking_id: booking.id, 
+          pilot_id: pilotId 
+        }]);
+
+      if (error) throw error;
       
-      queryClient.invalidateQueries({ queryKey: ['pilot-assignments', booking.id] });
+      queryClient.invalidateQueries({ 
+        queryKey: ['pilot-assignment-ids', booking.id] 
+      });
     } catch (error) {
       console.error('Error assigning pilot:', error);
     }
@@ -199,13 +209,17 @@ const EditBookingModal = ({
 
   const handlePilotUnassignment = async (pilotId: string) => {
     try {
-      await supabase
+      const { error } = await supabase
         .from('pilot_assignments')
         .delete()
         .eq('booking_id', booking.id)
         .eq('pilot_id', pilotId);
+
+      if (error) throw error;
       
-      queryClient.invalidateQueries({ queryKey: ['pilot-assignments', booking.id] });
+      queryClient.invalidateQueries({ 
+        queryKey: ['pilot-assignment-ids', booking.id] 
+      });
     } catch (error) {
       console.error('Error unassigning pilot:', error);
     }
