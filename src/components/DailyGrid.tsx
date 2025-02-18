@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { format } from "date-fns";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -344,7 +343,6 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
   const getTimeSlotData = (time: string): SlotType[] => {
     const timeBookings = bookingsData?.filter(b => b.time_slot === time) || [];
     
-    // Get pilot availability slots
     const pilotSlots: (AvailableSlot | UnavailableSlot)[] = availablePilots.map(pilot => {
       const isAvailable = availabilitiesData?.some(
         (a: PilotAvailability) => 
@@ -357,17 +355,14 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         : { type: 'unavailable' as const, pilot };
     });
 
-    // Sort available slots first
     pilotSlots.sort((a, b) => {
       if (a.type === 'available' && b.type === 'unavailable') return -1;
       if (a.type === 'unavailable' && b.type === 'available') return 1;
       return 0;
     });
 
-    // Only include actual pilot slots
     let availableSlots: SlotType[] = [...pilotSlots];
 
-    // Process bookings
     let finalSlots: SlotType[] = [...availableSlots];
     let usedSlots = 0;
 
@@ -375,15 +370,12 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
       const width = booking.number_of_people;
       if (width <= 0) continue;
 
-      // Find first available slot
       const availableIndex = finalSlots.findIndex(slot => slot.type === 'available');
       if (availableIndex === -1) continue;
 
-      // Get the pilot from the available slot
       const availableSlot = finalSlots[availableIndex] as AvailableSlot;
       const pilot = availableSlot.pilot;
 
-      // Create booking slot
       const bookingSlot: BookingSlot = {
         type: 'booking',
         pilot,
@@ -392,7 +384,6 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
       };
       finalSlots[availableIndex] = bookingSlot;
 
-      // Hide subsequent slots
       for (let i = 1; i < width; i++) {
         if (availableIndex + i < finalSlots.length) {
           const hiddenSlot: HiddenSlot = { type: 'hidden', pilot };
@@ -404,6 +395,10 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
     }
 
     return finalSlots;
+  };
+
+  const getAvailablePilotsCount = (time: string) => {
+    return availabilitiesData?.filter(a => a.time_slot === time).length || 0;
   };
 
   return (
