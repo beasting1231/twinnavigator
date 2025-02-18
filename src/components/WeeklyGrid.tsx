@@ -211,13 +211,24 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
 
     if (!booking) return true;
 
-    const availablePilots = availabilities.filter(a => 
-      a.day === day && 
-      a.time_slot === timeSlot
-    ).length;
+    const uniqueAvailablePilots = new Set(
+      availabilities
+        .filter(a => a.day === day && a.time_slot === timeSlot)
+        .map(a => a.pilot_id)
+    ).size;
 
-    return availablePilots > booking.number_of_people;
-  }, [bookings, availabilities]);
+    const isPilotAvailable = availabilities.some(
+      a => a.day === day && 
+          a.time_slot === timeSlot && 
+          a.pilot_id === user?.id
+    );
+
+    if (isPilotAvailable && uniqueAvailablePilots <= booking.number_of_people) {
+      return false;
+    }
+
+    return true;
+  }, [bookings, availabilities, user?.id]);
 
   const handleAvailabilityToggle = useCallback((day: string, timeSlot: string) => {
     if (!user?.id) return;
