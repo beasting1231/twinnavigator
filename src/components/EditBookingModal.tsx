@@ -6,6 +6,7 @@ import { format, parseISO } from 'date-fns';
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
@@ -84,7 +85,7 @@ const EditBookingModal = ({
     }
   });
 
-  const formattedDate = date ? format(date, 'yyyy-MM-dd') : undefined;
+  const formattedDate = date ? format(date, 'yyyy-MM-dd') : booking.booking_date;
 
   const { 
     register, 
@@ -120,26 +121,30 @@ const EditBookingModal = ({
     }
   });
 
-  const { data: availablePilotsForTime = {} } = useQuery({
+  const { data: availablePilotsForTime = {}, isLoading: isPilotsLoading } = useQuery({
     queryKey: ['available-pilots-count', formattedDate],
     enabled: !!formattedDate,
     queryFn: async () => {
-      if (!formattedDate) {
-        throw new Error('Date is required');
-      }
-
+      console.log('Fetching pilots for date:', formattedDate);
+      
       const { data: availabilities, error } = await supabase
         .from('pilot_availability')
         .select('time_slot, pilot_id')
         .eq('day', formattedDate);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching availabilities:', error);
+        throw error;
+      }
+
+      console.log('Received availabilities:', availabilities);
 
       const pilotCounts: Record<string, number> = {};
-      availabilities?.forEach(availability => {
-        pilotCounts[availability.time_slot] = (pilotCounts[availability.time_slot] || 0) + 1;
+      TIMES.forEach(time => {
+        pilotCounts[time] = availabilities?.filter(a => a.time_slot === time).length || 0;
       });
 
+      console.log('Calculated pilot counts:', pilotCounts);
       return pilotCounts;
     }
   });
@@ -178,10 +183,8 @@ const EditBookingModal = ({
     queryKey: ['available-pilots', formattedDate, selectedTimeSlot],
     enabled: !!formattedDate && !!selectedTimeSlot,
     queryFn: async () => {
-      if (!formattedDate || !selectedTimeSlot) {
-        throw new Error('Date and time slot are required');
-      }
-
+      console.log('Fetching available pilots for:', { formattedDate, selectedTimeSlot });
+      
       const { data: availabilities, error: availabilitiesError } = await supabase
         .from('pilot_availability')
         .select(`
@@ -196,6 +199,8 @@ const EditBookingModal = ({
         .eq('time_slot', selectedTimeSlot);
 
       if (availabilitiesError) throw availabilitiesError;
+
+      console.log('Received available pilots:', availabilities);
       
       return availabilities
         .filter(a => a.profiles)
@@ -207,13 +212,14 @@ const EditBookingModal = ({
   });
 
   const handleTimeSlotChange = (value: string) => {
-    const availablePilotsCount = availablePilotsForTime[value] || 0;
+    const availableCount = availablePilotsForTime[value] || 0;
+    console.log('Handling time slot change:', { value, availableCount, required: booking.number_of_people });
     
-    if (availablePilotsCount < booking.number_of_people) {
+    if (availableCount < booking.number_of_people) {
       toast({
         variant: "destructive",
         title: "Invalid Time Slot",
-        description: `This time slot only has ${availablePilotsCount} pilot${availablePilotsCount === 1 ? '' : 's'} available. You need ${booking.number_of_people}.`,
+        description: `This time slot only has ${availableCount} pilot${availableCount === 1 ? '' : 's'} available. You need ${booking.number_of_people}.`,
       });
       return;
     }
@@ -225,11 +231,8 @@ const EditBookingModal = ({
   const handleFormSubmit = async (data: BookingFormData) => {
     console.log('EditBookingModal - handleFormSubmit called with data:', data);
     try {
-      const formattedDate = date ? format(date, 'yyyy-MM-dd') : booking.booking_date;
-      
       const updatedData = {
         ...data,
-        id: booking.id,
         booking_date: formattedDate,
       };
       
@@ -241,45 +244,6 @@ const EditBookingModal = ({
     }
   };
 
-  const handlePilotAssignment = async (pilotId: string) => {
-    try {
-      const { error } = await supabase
-        .from('pilot_assignments')
-        .upsert([{ 
-          booking_id: booking.id, 
-          pilot_id: pilotId,
-        }]);
-
-      if (error) throw error;
-      
-      queryClient.invalidateQueries({ 
-        queryKey: ['assigned-pilot-ids', booking.id] 
-      });
-    } catch (error) {
-      console.error('Error assigning pilot:', error);
-    }
-  };
-
-  const handlePilotUnassignment = async (pilotId: string) => {
-    try {
-      const { error } = await supabase
-        .from('pilot_assignments')
-        .delete()
-        .match({ 
-          booking_id: booking.id,
-          pilot_id: pilotId 
-        });
-
-      if (error) throw error;
-      
-      queryClient.invalidateQueries({ 
-        queryKey: ['assigned-pilot-ids', booking.id] 
-      });
-    } catch (error) {
-      console.error('Error unassigning pilot:', error);
-    }
-  };
-
   React.useEffect(() => {
     if (isOpen && booking.booking_date) {
       console.log('EditBookingModal - Resetting form with booking:', booking);
@@ -287,27 +251,28 @@ const EditBookingModal = ({
         const parsedDate = parseISO(booking.booking_date);
         setDate(parsedDate);
         setSelectedTimeSlot(booking.time_slot);
+
+        reset({
+          id: booking.id,
+          name: booking.name,
+          pickup_location: booking.pickup_location,
+          number_of_people: booking.number_of_people,
+          phone: booking.phone || '',
+          email: booking.email || '',
+          tag_id: booking.tag_id || '',
+          booking_date: booking.booking_date,
+          time_slot: booking.time_slot,
+        });
       } catch (error) {
         console.error('Error parsing date in useEffect:', error);
       }
-
-      reset({
-        id: booking.id,
-        name: booking.name,
-        pickup_location: booking.pickup_location,
-        number_of_people: booking.number_of_people,
-        phone: booking.phone || '',
-        email: booking.email || '',
-        tag_id: booking.tag_id || '',
-        booking_date: booking.booking_date,
-        time_slot: booking.time_slot,
-      });
     }
   }, [isOpen, booking, reset]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
+        <DialogTitle>Edit Booking</DialogTitle>
         <Tabs defaultValue="details" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="details">Booking Details</TabsTrigger>
@@ -338,7 +303,7 @@ const EditBookingModal = ({
                       className="w-full justify-start text-left font-normal"
                       type="button"
                     >
-                      {date ? format(date, 'PPP') : booking.booking_date ? format(parseISO(booking.booking_date), 'PPP') : 'Pick a date'}
+                      {date ? format(date, 'PPP') : 'Pick a date'}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
