@@ -30,6 +30,7 @@ interface EditBookingModalProps {
   onDelete: () => void;
   onSubmit: (data: BookingFormData) => void;
   booking: {
+    id: string; // Adding this explicitly
     name: string;
     pickup_location: string;
     number_of_people: number;
@@ -57,16 +58,30 @@ const EditBookingModal = ({
   booking,
   maxPeople 
 }: EditBookingModalProps) => {
+  console.log('EditBookingModal - Rendering with booking:', booking);
+
   const { 
     register, 
     handleSubmit, 
     formState: { errors },
     reset,
     setValue,
+    watch,
   } = useForm<BookingFormData>({
     resolver: zodResolver(bookingSchema),
-    defaultValues: booking
+    defaultValues: {
+      name: booking.name,
+      pickup_location: booking.pickup_location,
+      number_of_people: booking.number_of_people,
+      phone: booking.phone || '',
+      email: booking.email || '',
+      tag_id: booking.tag_id || '',
+    }
   });
+
+  // Watch form values for debugging
+  const formValues = watch();
+  console.log('EditBookingModal - Current form values:', formValues);
 
   const { data: tags = [] } = useQuery({
     queryKey: ['tags'],
@@ -81,10 +96,12 @@ const EditBookingModal = ({
   });
 
   const handleFormSubmit = async (data: BookingFormData) => {
-    console.log('EditBookingModal - Form Data before submission:', data);
+    console.log('EditBookingModal - handleFormSubmit called with data:', data);
     try {
-      console.log('EditBookingModal - Calling onSubmit with data');
-      await onSubmit(data);
+      await onSubmit({
+        ...data,
+        id: booking.id, // Ensure we're passing the ID
+      });
       console.log('EditBookingModal - onSubmit completed successfully');
       onClose();
     } catch (error) {
@@ -94,15 +111,20 @@ const EditBookingModal = ({
 
   React.useEffect(() => {
     if (isOpen) {
-      reset(booking);
-      if (booking.tag_id) {
-        setValue('tag_id', booking.tag_id);
-      }
+      console.log('EditBookingModal - Resetting form with booking:', booking);
+      reset({
+        name: booking.name,
+        pickup_location: booking.pickup_location,
+        number_of_people: booking.number_of_people,
+        phone: booking.phone || '',
+        email: booking.email || '',
+        tag_id: booking.tag_id || '',
+      });
     }
-  }, [isOpen, booking, reset, setValue]);
+  }, [isOpen, booking, reset]);
 
   return (
-    <Dialog open={isOpen}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="pr-8">Edit Booking</DialogTitle>
@@ -110,7 +132,13 @@ const EditBookingModal = ({
             Make changes to your booking here. Click save when you're done.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+        <form 
+          onSubmit={(e) => {
+            console.log('EditBookingModal - Form submit event triggered');
+            handleSubmit(handleFormSubmit)(e);
+          }} 
+          className="space-y-4"
+        >
           <div>
             <Label htmlFor="name">Name *</Label>
             <Input
@@ -178,7 +206,10 @@ const EditBookingModal = ({
           <div>
             <Label htmlFor="tag">Tag</Label>
             <Select 
-              onValueChange={(value) => setValue('tag_id', value)}
+              onValueChange={(value) => {
+                console.log('EditBookingModal - Tag selected:', value);
+                setValue('tag_id', value);
+              }}
               defaultValue={booking.tag_id}
             >
               <SelectTrigger>
@@ -199,13 +230,17 @@ const EditBookingModal = ({
               type="button" 
               variant="destructive"
               onClick={() => {
+                console.log('EditBookingModal - Delete button clicked');
                 onDelete();
                 onClose();
               }}
             >
               Delete Booking
             </Button>
-            <Button type="submit">
+            <Button 
+              type="submit"
+              onClick={() => console.log('EditBookingModal - Submit button clicked')}
+            >
               Save Changes
             </Button>
           </div>
