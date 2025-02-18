@@ -26,7 +26,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { BookingFormData } from './BookingModal';
 
@@ -71,6 +71,7 @@ const EditBookingModal = ({
   booking,
   maxPeople 
 }: EditBookingModalProps) => {
+  const queryClient = useQueryClient();
   const [date, setDate] = React.useState<Date | undefined>(() => {
     try {
       return booking.booking_date ? parseISO(booking.booking_date) : undefined;
@@ -133,30 +134,33 @@ const EditBookingModal = ({
       if (availabilitiesError) throw availabilitiesError;
       
       // Remove duplicates and null profiles
-      return [...new Map(availabilities
+      return availabilities
         .filter(a => a.profiles)
-        .map(a => [a.profiles.id, a.profiles]))
-        .values()];
+        .reduce((acc: any[], curr) => {
+          if (!acc.find(p => p.id === curr.profiles.id)) {
+            acc.push(curr.profiles);
+          }
+          return acc;
+        }, []);
     }
   });
 
   const { data: assignedPilots = [] } = useQuery({
-    queryKey: ['assigned-pilots', booking.id],
+    queryKey: ['pilot-assignments', booking.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('pilot_assignments')
-        .select(`
-          pilot_id,
-          profiles:pilot_id (
-            id,
-            username,
-            gender
-          )
-        `)
-        .eq('booking_id', booking.id);
+      const { data: assignments, error } = await supabase
+        .from('profiles')
+        .select('id, username, gender')
+        .in('id', 
+          supabase
+            .from('pilot_assignments')
+            .select('pilot_id')
+            .eq('booking_id', booking.id)
+            .then(result => (result.data || []).map(a => a.pilot_id))
+        );
 
       if (error) throw error;
-      return data;
+      return assignments || [];
     }
   });
 
@@ -180,29 +184,29 @@ const EditBookingModal = ({
   };
 
   const handlePilotAssignment = async (pilotId: string) => {
-    const { error } = await supabase
-      .from('pilot_assignments')
-      .insert({
-        booking_id: booking.id,
-        pilot_id: pilotId
-      });
-
-    if (error) {
+    try {
+      await supabase
+        .from('pilot_assignments')
+        .insert([
+          { booking_id: booking.id, pilot_id: pilotId }
+        ]);
+      
+      queryClient.invalidateQueries({ queryKey: ['pilot-assignments', booking.id] });
+    } catch (error) {
       console.error('Error assigning pilot:', error);
-      return;
     }
   };
 
   const handlePilotUnassignment = async (pilotId: string) => {
-    const { error } = await supabase
-      .from('pilot_assignments')
-      .delete()
-      .match({
-        booking_id: booking.id,
-        pilot_id: pilotId
-      });
-
-    if (error) {
+    try {
+      await supabase
+        .from('pilot_assignments')
+        .delete()
+        .eq('booking_id', booking.id)
+        .eq('pilot_id', pilotId);
+      
+      queryClient.invalidateQueries({ queryKey: ['pilot-assignments', booking.id] });
+    } catch (error) {
       console.error('Error unassigning pilot:', error);
     }
   };
@@ -415,13 +419,13 @@ const EditBookingModal = ({
               </div>
               
               <div className="space-y-2">
-                {assignedPilots.map((assignment) => (
-                  <div key={assignment.pilot_id} className="flex items-center justify-between p-2 border rounded">
-                    <span>{assignment.profiles.username}</span>
+                {assignedPilots.map((pilot) => (
+                  <div key={pilot.id} className="flex items-center justify-between p-2 border rounded">
+                    <span>{pilot.username}</span>
                     <Button 
                       variant="destructive" 
                       size="sm"
-                      onClick={() => handlePilotUnassignment(assignment.pilot_id)}
+                      onClick={() => handlePilotUnassignment(pilot.id)}
                     >
                       Remove
                     </Button>
@@ -432,7 +436,7 @@ const EditBookingModal = ({
               <div className="space-y-2">
                 <h3 className="text-lg font-medium">Available Pilots</h3>
                 {availablePilots
-                  .filter(pilot => !assignedPilots.some(ap => ap.pilot_id === pilot.id))
+                  .filter(pilot => !assignedPilots.some(ap => ap.id === pilot.id))
                   .map((pilot) => (
                     <div key={pilot.id} className="flex items-center justify-between p-2 border rounded">
                       <span>{pilot.username}</span>
