@@ -76,16 +76,16 @@ const EditBookingModal = ({
   const { toast } = useToast();
   const [selectedTimeSlot, setSelectedTimeSlot] = React.useState(booking.time_slot);
   
-  const [date, setDate] = React.useState<Date | undefined>(() => {
+  const [date, setDate] = React.useState<Date>(() => {
     try {
-      return booking.booking_date ? parseISO(booking.booking_date) : undefined;
+      return parseISO(booking.booking_date);
     } catch (error) {
       console.error('Error parsing date:', error);
-      return undefined;
+      return new Date();
     }
   });
 
-  const formattedDate = date ? format(date, 'yyyy-MM-dd') : booking.booking_date;
+  const formattedDate = format(date, 'yyyy-MM-dd');
 
   const { 
     register, 
@@ -364,13 +364,15 @@ const EditBookingModal = ({
                       className="w-full justify-start text-left font-normal"
                       type="button"
                     >
-                      {date ? format(date, 'PPP') : 'Pick a date'}
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {format(date, 'PPP')}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
                       selected={date}
+                      defaultMonth={date}
                       onSelect={(newDate) => {
                         if (newDate) {
                           setDate(newDate);
