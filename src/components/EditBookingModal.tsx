@@ -253,7 +253,16 @@ const EditBookingModal = ({
     }
 
     setSelectedTimeSlot(value);
-    setValue('time_slot', value, { shouldValidate: true });
+    setValue('time_slot', value, { shouldValidate: true, shouldDirty: true });
+  };
+
+  const handleDateChange = (newDate: Date | undefined) => {
+    if (newDate) {
+      setDate(newDate);
+      const formattedNewDate = format(newDate, 'yyyy-MM-dd');
+      setValue('booking_date', formattedNewDate, { shouldValidate: true, shouldDirty: true });
+      setIsCalendarOpen(false);
+    }
   };
 
   const handleFormSubmit = async (data: BookingFormData) => {
@@ -390,14 +399,7 @@ const EditBookingModal = ({
                     <Calendar
                       mode="single"
                       selected={date}
-                      onSelect={(newDate) => {
-                        if (newDate) {
-                          setDate(newDate);
-                          const formattedNewDate = format(newDate, 'yyyy-MM-dd');
-                          setValue('booking_date', formattedNewDate, { shouldValidate: true });
-                          setIsCalendarOpen(false);
-                        }
-                      }}
+                      onSelect={handleDateChange}
                       initialFocus
                     />
                   </PopoverContent>
