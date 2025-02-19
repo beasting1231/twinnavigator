@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -28,7 +27,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { BookingFormData } from './BookingModal';
 import { useToast } from "@/components/ui/use-toast";
@@ -77,6 +76,7 @@ const EditBookingModal = ({
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [selectedTimeSlot, setSelectedTimeSlot] = React.useState(booking.time_slot);
+  const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
   
   const [date, setDate] = React.useState<Date>(() => {
     try {
@@ -349,17 +349,14 @@ const EditBookingModal = ({
           
           <TabsContent value="details">
             <form 
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSubmit(handleFormSubmit)(e);
-              }} 
+              onSubmit={handleSubmit(handleFormSubmit)} 
               className="space-y-4"
             >
               <input type="hidden" {...register('id')} />
               
               <div className="space-y-2">
                 <Label>Date</Label>
-                <Popover>
+                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
@@ -381,9 +378,10 @@ const EditBookingModal = ({
                           setValue('booking_date', format(newDate, 'yyyy-MM-dd'));
                           setSelectedTimeSlot('');
                           setValue('time_slot', '');
+                          setIsCalendarOpen(false);
                         }
                       }}
-                      className="cursor-pointer rounded-md border"
+                      className="rounded-md border"
                     />
                   </PopoverContent>
                 </Popover>
