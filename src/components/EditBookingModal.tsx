@@ -27,10 +27,10 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { BookingFormData } from './BookingModal';
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 const TIMES = ["7:30", "8:30", "9:45", "11:00", "12:30", "14:00", "15:30", "16:45"];
 
@@ -79,6 +79,7 @@ const EditBookingModal = ({
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
   
   const [date, setDate] = React.useState<Date>(() => {
+    if (!booking.booking_date) return new Date();
     try {
       return parseISO(booking.booking_date);
     } catch (error) {
@@ -233,18 +234,10 @@ const EditBookingModal = ({
   const handleFormSubmit = async (data: BookingFormData) => {
     console.log('EditBookingModal - handleFormSubmit called with data:', data);
     try {
-      if (!formattedDate) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Please select a date",
-        });
-        return;
-      }
-
       const updatedData = {
         ...data,
         booking_date: formattedDate,
+        time_slot: selectedTimeSlot,
       };
       
       console.log('EditBookingModal - Submitting with updatedData:', updatedData);
@@ -252,6 +245,11 @@ const EditBookingModal = ({
       onClose();
     } catch (error) {
       console.error('EditBookingModal - Error submitting form:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update booking",
+      });
     }
   };
 
@@ -312,30 +310,17 @@ const EditBookingModal = ({
 
   React.useEffect(() => {
     if (isOpen && booking.booking_date) {
-      console.log('EditBookingModal - Resetting form with booking:', booking);
       try {
         const parsedDate = parseISO(booking.booking_date);
         setDate(parsedDate);
         setSelectedTimeSlot(booking.time_slot);
         setValue('booking_date', booking.booking_date);
         setValue('time_slot', booking.time_slot);
-
-        reset({
-          id: booking.id,
-          name: booking.name,
-          pickup_location: booking.pickup_location,
-          number_of_people: booking.number_of_people,
-          phone: booking.phone || '',
-          email: booking.email || '',
-          tag_id: booking.tag_id || '',
-          booking_date: booking.booking_date,
-          time_slot: booking.time_slot,
-        });
       } catch (error) {
         console.error('Error parsing date in useEffect:', error);
       }
     }
-  }, [isOpen, booking, reset, setValue]);
+  }, [isOpen, booking, setValue]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -348,10 +333,7 @@ const EditBookingModal = ({
           </TabsList>
           
           <TabsContent value="details">
-            <form 
-              onSubmit={handleSubmit(handleFormSubmit)} 
-              className="space-y-4"
-            >
+            <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
               <input type="hidden" {...register('id')} />
               
               <div className="space-y-2">
@@ -359,19 +341,18 @@ const EditBookingModal = ({
                 <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                   <PopoverTrigger asChild>
                     <Button
+                      type="button"
                       variant="outline"
                       className="w-full justify-start text-left font-normal"
-                      type="button"
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(date, 'PPP')}
+                      {date ? format(date, 'PPP') : 'Pick a date'}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
                       selected={date}
-                      defaultMonth={date}
                       onSelect={(newDate) => {
                         if (newDate) {
                           setDate(newDate);
@@ -381,7 +362,7 @@ const EditBookingModal = ({
                           setIsCalendarOpen(false);
                         }
                       }}
-                      className="rounded-md border"
+                      initialFocus
                     />
                   </PopoverContent>
                 </Popover>
