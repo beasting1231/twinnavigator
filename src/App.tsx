@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import DailyPlan from "./pages/DailyPlan";
@@ -23,6 +23,17 @@ const queryClient = new QueryClient({
   },
 });
 
+// Separate component to handle the root redirect
+const RootRedirect = () => {
+  const navigate = useNavigate();
+  
+  React.useEffect(() => {
+    navigate('/daily-plan', { replace: true });
+  }, [navigate]);
+
+  return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
@@ -30,12 +41,7 @@ const App = () => (
         <TooltipProvider>
           <Routes>
             <Route path="/auth" element={<Auth />} />
-            <Route
-              path="/"
-              element={
-                <Navigate to="/daily-plan" replace />
-              }
-            />
+            <Route path="/" element={<RootRedirect />} />
             <Route
               path="/onboarding"
               element={
