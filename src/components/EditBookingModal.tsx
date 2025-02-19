@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { format, parseISO } from 'date-fns';
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -30,7 +30,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { BookingFormData } from './BookingModal';
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 
 const TIMES = ["7:30", "8:30", "9:45", "11:00", "12:30", "14:00", "15:30", "16:45"];
 
@@ -38,7 +38,7 @@ interface EditBookingModalProps {
   isOpen: boolean;
   onClose: () => void;
   onDelete: () => void;
-  onSubmit: (data: BookingFormData) => void;
+  onSubmit: (data: BookingFormData) => Promise<void>;
   booking: {
     id: string;
     name: string;
@@ -54,15 +54,15 @@ interface EditBookingModalProps {
 }
 
 const bookingSchema = z.object({
-  id: z.string().optional(),
+  id: z.string(),
   name: z.string().min(1, "Name is required"),
   pickup_location: z.string().min(1, "Pickup location is required"),
-  number_of_people: z.number().min(1).max(100),
+  number_of_people: z.number().min(1, "Must have at least 1 person").max(100, "Maximum 100 people"),
   phone: z.string().optional(),
-  email: z.string().email().optional().or(z.literal("")),
+  email: z.string().email("Invalid email address").optional().or(z.literal("")),
   tag_id: z.string().optional(),
-  booking_date: z.string(),
-  time_slot: z.string(),
+  booking_date: z.string().min(1, "Booking date is required"),
+  time_slot: z.string().min(1, "Time slot is required"),
 });
 
 const EditBookingModal = ({ 
@@ -75,6 +75,7 @@ const EditBookingModal = ({
 }: EditBookingModalProps) => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = React.useState(booking.time_slot);
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
   
@@ -93,10 +94,11 @@ const EditBookingModal = ({
   const { 
     register, 
     handleSubmit, 
-    formState: { errors },
+    formState: { errors, isDirty },
     reset,
     setValue,
     watch,
+    trigger,
   } = useForm<BookingFormData>({
     resolver: zodResolver(bookingSchema),
     defaultValues: {
@@ -111,6 +113,29 @@ const EditBookingModal = ({
       time_slot: booking.time_slot,
     }
   });
+
+  React.useEffect(() => {
+    if (isOpen) {
+      reset({
+        id: booking.id,
+        name: booking.name,
+        pickup_location: booking.pickup_location,
+        number_of_people: booking.number_of_people,
+        phone: booking.phone || '',
+        email: booking.email || '',
+        tag_id: booking.tag_id || '',
+        booking_date: booking.booking_date,
+        time_slot: booking.time_slot,
+      });
+      setSelectedTimeSlot(booking.time_slot);
+      try {
+        setDate(parseISO(booking.booking_date));
+      } catch (error) {
+        console.error('Error parsing date on reset:', error);
+        setDate(new Date());
+      }
+    }
+  }, [booking, isOpen, reset]);
 
   const { data: tags = [] } = useQuery({
     queryKey: ['tags'],
@@ -214,7 +239,7 @@ const EditBookingModal = ({
     }
   });
 
-  const handleTimeSlotChange = (value: string) => {
+  const handleTimeSlotChange = async (value: string) => {
     const availableCount = availablePilotsForTime[value] || 0;
     console.log('Handling time slot change:', { value, availableCount, required: booking.number_of_people });
     
@@ -228,28 +253,50 @@ const EditBookingModal = ({
     }
 
     setSelectedTimeSlot(value);
-    setValue('time_slot', value);
+    setValue('time_slot', value, { shouldValidate: true });
   };
 
   const handleFormSubmit = async (data: BookingFormData) => {
-    console.log('EditBookingModal - handleFormSubmit called with data:', data);
     try {
-      const updatedData = {
+      setIsSubmitting(true);
+      console.log('EditBookingModal - Submitting form with data:', data);
+
+      const isValid = await trigger();
+      if (!isValid) {
+        console.log('EditBookingModal - Form validation failed:', errors);
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "Please check all required fields",
+        });
+        return;
+      }
+
+      const submissionData = {
         ...data,
         booking_date: formattedDate,
         time_slot: selectedTimeSlot,
       };
+
+      console.log('EditBookingModal - Submitting with data:', submissionData);
+      await onSubmit(submissionData);
       
-      console.log('EditBookingModal - Submitting with updatedData:', updatedData);
-      await onSubmit(updatedData);
+      reset(submissionData);
       onClose();
+      
+      toast({
+        title: "Success",
+        description: "Booking updated successfully",
+      });
     } catch (error) {
-      console.error('EditBookingModal - Error submitting form:', error);
+      console.error('EditBookingModal - Form submission error:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to update booking",
+        description: "Failed to update booking. Please try again.",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -308,22 +355,12 @@ const EditBookingModal = ({
     }
   };
 
-  React.useEffect(() => {
-    if (isOpen && booking.booking_date) {
-      try {
-        const parsedDate = parseISO(booking.booking_date);
-        setDate(parsedDate);
-        setSelectedTimeSlot(booking.time_slot);
-        setValue('booking_date', booking.booking_date);
-        setValue('time_slot', booking.time_slot);
-      } catch (error) {
-        console.error('Error parsing date in useEffect:', error);
-      }
-    }
-  }, [isOpen, booking, setValue]);
-
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open && !isSubmitting) {
+        onClose();
+      }
+    }}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogTitle>Edit Booking</DialogTitle>
         <Tabs defaultValue="details" className="w-full">
@@ -337,7 +374,7 @@ const EditBookingModal = ({
               <input type="hidden" {...register('id')} />
               
               <div className="space-y-2">
-                <Label>Date</Label>
+                <Label>Date *</Label>
                 <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                   <PopoverTrigger asChild>
                     <Button
@@ -356,9 +393,8 @@ const EditBookingModal = ({
                       onSelect={(newDate) => {
                         if (newDate) {
                           setDate(newDate);
-                          setValue('booking_date', format(newDate, 'yyyy-MM-dd'));
-                          setSelectedTimeSlot('');
-                          setValue('time_slot', '');
+                          const formattedNewDate = format(newDate, 'yyyy-MM-dd');
+                          setValue('booking_date', formattedNewDate, { shouldValidate: true });
                           setIsCalendarOpen(false);
                         }
                       }}
@@ -366,10 +402,13 @@ const EditBookingModal = ({
                     />
                   </PopoverContent>
                 </Popover>
+                {errors.booking_date && (
+                  <p className="text-sm text-destructive">{errors.booking_date.message}</p>
+                )}
               </div>
 
               <div className="space-y-2">
-                <Label>Time Slot</Label>
+                <Label>Time Slot *</Label>
                 <Select 
                   onValueChange={handleTimeSlotChange}
                   value={watch('time_slot')}
@@ -395,9 +434,12 @@ const EditBookingModal = ({
                     })}
                   </SelectContent>
                 </Select>
+                {errors.time_slot && (
+                  <p className="text-sm text-destructive">{errors.time_slot.message}</p>
+                )}
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="name">Name *</Label>
                 <Input
                   id="name"
@@ -405,11 +447,11 @@ const EditBookingModal = ({
                   className="mt-1"
                 />
                 {errors.name && (
-                  <p className="text-sm text-red-500 mt-1">{errors.name.message}</p>
+                  <p className="text-sm text-destructive">{errors.name.message}</p>
                 )}
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="pickup_location">Pickup Location *</Label>
                 <Input
                   id="pickup_location"
@@ -417,11 +459,11 @@ const EditBookingModal = ({
                   className="mt-1"
                 />
                 {errors.pickup_location && (
-                  <p className="text-sm text-red-500 mt-1">{errors.pickup_location.message}</p>
+                  <p className="text-sm text-destructive">{errors.pickup_location.message}</p>
                 )}
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="number_of_people">Number of People *</Label>
                 <Input
                   id="number_of_people"
@@ -432,24 +474,24 @@ const EditBookingModal = ({
                   className="mt-1"
                 />
                 {errors.number_of_people && (
-                  <p className="text-sm text-red-500 mt-1">{errors.number_of_people.message}</p>
+                  <p className="text-sm text-destructive">{errors.number_of_people.message}</p>
                 )}
               </div>
 
-              <div>
-                <Label htmlFor="phone">Phone (Optional)</Label>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone</Label>
                 <Input
                   id="phone"
                   {...register('phone')}
                   className="mt-1"
                 />
                 {errors.phone && (
-                  <p className="text-sm text-red-500 mt-1">{errors.phone.message}</p>
+                  <p className="text-sm text-destructive">{errors.phone.message}</p>
                 )}
               </div>
 
-              <div>
-                <Label htmlFor="email">Email (Optional)</Label>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
                   type="email"
@@ -457,15 +499,15 @@ const EditBookingModal = ({
                   className="mt-1"
                 />
                 {errors.email && (
-                  <p className="text-sm text-red-500 mt-1">{errors.email.message}</p>
+                  <p className="text-sm text-destructive">{errors.email.message}</p>
                 )}
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="tag">Tag</Label>
                 <Select 
-                  onValueChange={(value) => setValue('tag_id', value)}
-                  defaultValue={booking.tag_id || undefined}
+                  onValueChange={(value) => setValue('tag_id', value, { shouldValidate: true })}
+                  value={watch('tag_id') || undefined}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a tag" />
@@ -485,14 +527,27 @@ const EditBookingModal = ({
                   type="button" 
                   variant="destructive"
                   onClick={() => {
-                    onDelete();
-                    onClose();
+                    if (window.confirm('Are you sure you want to delete this booking?')) {
+                      onDelete();
+                      onClose();
+                    }
                   }}
+                  disabled={isSubmitting}
                 >
                   Delete Booking
                 </Button>
-                <Button type="submit">
-                  Save Changes
+                <Button 
+                  type="submit"
+                  disabled={isSubmitting || !isDirty}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
                 </Button>
               </div>
             </form>
