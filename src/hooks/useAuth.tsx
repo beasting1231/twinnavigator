@@ -1,4 +1,3 @@
-
 import { useEffect, useState, createContext, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User } from '@supabase/supabase-js';
@@ -24,9 +23,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  useEffect(() => {
+    const clearStaleState = async () => {
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (!session || sessionError) {
+          await supabase.auth.signOut();
+          setUser(null);
+          setProfile(null);
+          setError(null);
+          
+          if (sessionError) {
+            console.error('Session error detected:', sessionError);
+            throw sessionError;
+          }
+        }
+      } catch (error) {
+        console.error('Error clearing stale state:', error);
+      }
+    };
+
+    clearStaleState();
+  }, []);
 
   async function fetchProfile(userId: string) {
     try {
@@ -36,71 +58,104 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching profile:', error);
+        throw error;
+      }
+      
+      if (!data) {
+        console.error('No profile found for user:', userId);
+        throw new Error('No profile found');
+      }
+
       setProfile(data);
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error('Profile fetch error:', error);
+      await signOut();
       setError(error as Error);
     }
   }
 
   useEffect(() => {
+    let mounted = true;
+
     const initializeAuth = async () => {
       try {
         setError(null);
+        console.log('Initializing auth state...');
+        
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        if (sessionError) throw sessionError;
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          throw sessionError;
+        }
         
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          await fetchProfile(session.user.id);
+        if (mounted) {
+          console.log('Setting initial user state:', session?.user);
+          setUser(session?.user ?? null);
+          
+          if (session?.user) {
+            await fetchProfile(session.user.id);
+          } else {
+            setProfile(null);
+          }
         }
       } catch (error) {
-        console.error('Error checking initial session:', error);
-        setError(error as Error);
+        console.error('Auth initialization error:', error);
+        if (mounted) {
+          setError(error as Error);
+          setUser(null);
+          setProfile(null);
+        }
       } finally {
-        setLoading(false);
-        setInitialLoadComplete(true);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
     initializeAuth();
-  }, []);
-
-  useEffect(() => {
-    if (!initialLoadComplete) return;
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        console.log('Auth state changed:', { event: _event, session });
-        setError(null);
-        setUser(session?.user ?? null);
+      async (event, session) => {
+        console.log('Auth state changed:', { event, session });
         
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        } else {
-          setProfile(null);
+        if (mounted) {
+          setError(null);
+          setUser(session?.user ?? null);
+          
+          if (session?.user) {
+            await fetchProfile(session.user.id);
+          } else {
+            setProfile(null);
+          }
         }
       }
     );
 
-    return () => subscription.unsubscribe();
-  }, [initialLoadComplete]);
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
       setError(null);
+      console.log('Attempting sign in...');
+      
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
+      
       if (error) throw error;
       
       navigate('/');
     } catch (error: any) {
+      console.error('Sign in error:', error);
       setError(error);
       toast({
         variant: "destructive",
@@ -108,6 +163,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: error.message,
       });
       throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      setLoading(true);
+      console.log('Signing out...');
+      
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      setUser(null);
+      setProfile(null);
+      setError(null);
+      
+      navigate('/auth', { replace: true });
+    } catch (error: any) {
+      console.error('Sign out error:', error);
+      toast({
+        variant: "destructive",
+        title: "Error signing out",
+        description: error.message,
+      });
     } finally {
       setLoading(false);
     }
@@ -133,26 +213,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: error.message,
       });
       throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const signOut = async () => {
-    try {
-      setLoading(true);
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      
-      setUser(null);
-      setProfile(null);
-      navigate('/auth', { replace: true });
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error signing out",
-        description: error.message,
-      });
     } finally {
       setLoading(false);
     }
