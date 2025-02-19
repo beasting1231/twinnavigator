@@ -231,6 +231,15 @@ const EditBookingModal = ({
   const handleFormSubmit = async (data: BookingFormData) => {
     console.log('EditBookingModal - handleFormSubmit called with data:', data);
     try {
+      if (!formattedDate) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Please select a date",
+        });
+        return;
+      }
+
       const updatedData = {
         ...data,
         booking_date: formattedDate,
@@ -306,6 +315,8 @@ const EditBookingModal = ({
         const parsedDate = parseISO(booking.booking_date);
         setDate(parsedDate);
         setSelectedTimeSlot(booking.time_slot);
+        setValue('booking_date', booking.booking_date);
+        setValue('time_slot', booking.time_slot);
 
         reset({
           id: booking.id,
@@ -322,7 +333,7 @@ const EditBookingModal = ({
         console.error('Error parsing date in useEffect:', error);
       }
     }
-  }, [isOpen, booking, reset]);
+  }, [isOpen, booking, reset, setValue]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -343,11 +354,6 @@ const EditBookingModal = ({
               className="space-y-4"
             >
               <input type="hidden" {...register('id')} />
-              <input 
-                type="hidden" 
-                {...register('booking_date')} 
-                value={formattedDate}
-              />
               
               <div className="space-y-2">
                 <Label>Date</Label>
@@ -366,9 +372,11 @@ const EditBookingModal = ({
                       mode="single"
                       selected={date}
                       onSelect={(newDate) => {
-                        setDate(newDate);
                         if (newDate) {
+                          setDate(newDate);
                           setValue('booking_date', format(newDate, 'yyyy-MM-dd'));
+                          setSelectedTimeSlot('');
+                          setValue('time_slot', '');
                         }
                       }}
                       initialFocus
@@ -381,12 +389,10 @@ const EditBookingModal = ({
                 <Label>Time Slot</Label>
                 <Select 
                   onValueChange={handleTimeSlotChange}
-                  defaultValue={booking.time_slot}
+                  value={watch('time_slot')}
                 >
                   <SelectTrigger>
-                    <SelectValue>
-                      {watch('time_slot')}
-                    </SelectValue>
+                    <SelectValue placeholder="Select a time" />
                   </SelectTrigger>
                   <SelectContent>
                     {TIMES.map((time) => {
