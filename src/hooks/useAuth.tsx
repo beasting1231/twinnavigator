@@ -35,7 +35,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initializeAuth = async () => {
       try {
+        if (!mounted) return;
+        
         setError(null);
+        setLoading(true);
+        
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
@@ -43,16 +47,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           throw sessionError;
         }
 
-        if (mounted) {
-          if (session?.user) {
-            console.log('Session found, setting user:', session.user.id);
-            setUser(session.user);
-            await fetchProfile(session.user.id);
-          } else {
-            console.log('No session found');
-            setUser(null);
-            setProfile(null);
-          }
+        if (!mounted) return;
+
+        if (session?.user) {
+          console.log('Session found, setting user:', session.user.id);
+          setUser(session.user);
+          await fetchProfile(session.user.id);
+        } else {
+          console.log('No session found');
+          setUser(null);
+          setProfile(null);
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
@@ -75,16 +79,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', { event, session });
       
-      if (mounted) {
-        setError(null);
-        setUser(session?.user ?? null);
-        
+      if (!mounted) return;
+      
+      setError(null);
+      setLoading(true);
+      setUser(session?.user ?? null);
+      
+      try {
         if (session?.user) {
           await fetchProfile(session.user.id);
         } else {
           setProfile(null);
         }
-        setLoading(false);
+      } catch (error) {
+        console.error('Error during auth state change:', error);
+        setError(error as Error);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
     });
 
@@ -117,7 +130,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Profile fetch error:', error);
       setError(error as Error);
-      await signOut();
+      setProfile(null);
+      // Remove the signOut call to prevent potential infinite loops
+      // and let the error handling be managed by the parent components
     }
   }
 
