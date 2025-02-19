@@ -1,3 +1,4 @@
+
 import { useEffect, useState, createContext, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User } from '@supabase/supabase-js';
@@ -9,6 +10,7 @@ interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
+  error: Error | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -21,6 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -37,13 +40,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(data);
     } catch (error) {
       console.error('Error fetching profile:', error);
+      setError(error as Error);
     }
   }
 
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        setError(null);
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) throw sessionError;
+        
         setUser(session?.user ?? null);
         
         if (session?.user) {
@@ -51,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         console.error('Error checking initial session:', error);
+        setError(error as Error);
       } finally {
         setLoading(false);
         setInitialLoadComplete(true);
@@ -65,6 +74,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
+        console.log('Auth state changed:', { event: _event, session });
+        setError(null);
         setUser(session?.user ?? null);
         
         if (session?.user) {
@@ -81,6 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
+      setError(null);
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -89,6 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       navigate('/');
     } catch (error: any) {
+      setError(error);
       toast({
         variant: "destructive",
         title: "Error signing in",
@@ -178,6 +191,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         profile,
         loading,
+        error,
         signIn,
         signUp,
         signOut,
