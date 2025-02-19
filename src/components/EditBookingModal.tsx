@@ -383,7 +383,7 @@ const EditBookingModal = ({
                           setValue('time_slot', '');
                         }
                       }}
-                      initialFocus
+                      className="cursor-pointer rounded-md border"
                     />
                   </PopoverContent>
                 </Popover>
