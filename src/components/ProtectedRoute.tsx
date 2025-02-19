@@ -1,37 +1,59 @@
 
 import React from 'react';
 import { useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 
 export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading, error } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
-  const [isInitializing, setIsInitializing] = React.useState(true);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [showLoading, setShowLoading] = React.useState(false);
 
+  // Only show loading spinner after a delay to prevent flash
   useEffect(() => {
-    const timer = setTimeout(() => setIsInitializing(false), 2000); // Add a minimum loading time
+    const timer = setTimeout(() => {
+      if (loading) {
+        setShowLoading(true);
+      }
+    }, 500);
+
     return () => clearTimeout(timer);
-  }, []);
+  }, [loading]);
 
   useEffect(() => {
     if (!loading) {
-      console.log('ProtectedRoute - Auth state updated:', { user, profile, location: location.pathname });
-      
-      if (!user && location.pathname !== '/auth') {
-        console.log('ProtectedRoute - Redirecting to auth page');
-        navigate('/auth', { replace: true });
-      } else if (user && profile && !profile.is_onboarded && location.pathname !== '/onboarding') {
-        console.log('ProtectedRoute - Redirecting to onboarding');
-        navigate('/onboarding', { replace: true });
-      }
+      setShowLoading(false);
     }
-  }, [user, profile, loading, navigate, location.pathname]);
+  }, [loading]);
+
+  useEffect(() => {
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Authentication Error",
+        description: "Please try logging in again",
+      });
+      navigate('/auth');
+    }
+  }, [error, navigate, toast]);
+
+  // Handle redirect logic when auth state changes
+  useEffect(() => {
+    if (!loading && !user && location.pathname !== '/auth') {
+      console.log('ProtectedRoute: No user found, redirecting to auth');
+      navigate('/auth', { replace: true });
+    } else if (!loading && user && profile && !profile.is_onboarded && location.pathname !== '/onboarding') {
+      console.log('ProtectedRoute: User not onboarded, redirecting to onboarding');
+      navigate('/onboarding', { replace: true });
+    }
+  }, [user, profile, loading, location.pathname, navigate]);
 
   // Show loading state
-  if (loading || isInitializing) {
+  if (showLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin mb-4" />
@@ -40,26 +62,18 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  // Show error state if there's an authentication error
-  if (error) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background">
-        <p className="text-lg text-destructive font-medium">Authentication error</p>
-        <button 
-          onClick={() => navigate('/auth')}
-          className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-        >
-          Return to login
-        </button>
-      </div>
-    );
+  // If we're not logged in and trying to access a protected route, redirect to auth
+  if (!loading && !user && location.pathname !== '/auth') {
+    console.log('ProtectedRoute: Redirecting to auth page');
+    return <Navigate to="/auth" replace />;
   }
 
-  // If we're not logged in and on a protected route, don't render anything
-  if (!user && location.pathname !== '/auth') {
-    return null;
+  // If we're logged in but not onboarded and not on the onboarding page, redirect to onboarding
+  if (!loading && user && profile && !profile.is_onboarded && location.pathname !== '/onboarding') {
+    console.log('ProtectedRoute: Redirecting to onboarding');
+    return <Navigate to="/onboarding" replace />;
   }
 
-  // Render children if we're either logged in or on the auth page
+  // Render children if all conditions are met
   return <>{children}</>;
 };
