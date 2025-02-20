@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -28,6 +28,8 @@ import {
 } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { RealtimeChannel } from '@supabase/supabase-js';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { BookingFormData } from './BookingModal';
 import { useToast } from "@/components/ui/use-toast";
@@ -61,7 +63,7 @@ const bookingSchema = z.object({
   phone: z.string().optional(),
   email: z.string().email("Invalid email address").optional().or(z.literal("")),
   tag_id: z.string().optional(),
-  booking_date: z.string().min(1, "Booking date is required"),
+  booking_date: z.string(),
   time_slot: z.string().min(1, "Time slot is required"),
 });
 
@@ -73,23 +75,24 @@ const EditBookingModal = ({
   booking,
   maxPeople 
 }: EditBookingModalProps) => {
+  console.log('EditBookingModal render:', { 
+    booking, 
+    isOpen,
+    hasBookingDate: booking?.booking_date,
+    bookingDateValue: booking?.booking_date
+  });
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = React.useState(booking.time_slot);
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
+  const [isSavingPayments, setIsSavingPayments] = React.useState(false);
+  const [paymentAmounts, setPaymentAmounts] = React.useState<Record<string, number>>({});
   
-  const [date, setDate] = React.useState<Date>(() => {
-    if (!booking.booking_date) return new Date();
-    try {
-      return parseISO(booking.booking_date);
-    } catch (error) {
-      console.error('Error parsing date:', error);
-      return new Date();
-    }
-  });
+  const [date, setDate] = React.useState<Date | null>(null);
 
-  const formattedDate = format(date, 'yyyy-MM-dd');
+  const formattedDate = date ? format(date, 'yyyy-MM-dd') : booking?.booking_date;
+  console.log('EditBookingModal formattedDate:', { date, formattedDate, originalDate: booking?.booking_date });
 
   const { 
     register, 
@@ -114,9 +117,30 @@ const EditBookingModal = ({
     }
   });
 
+  console.log('EditBookingModal form initialized:', { 
+    defaultValues: {
+      id: booking.id,
+      name: booking.name,
+      pickup_location: booking.pickup_location,
+      number_of_people: booking.number_of_people,
+      phone: booking.phone || '',
+      email: booking.email || '',
+      tag_id: booking.tag_id || '',
+      booking_date: booking.booking_date,
+      time_slot: booking.time_slot,
+    }
+  });
+
   React.useEffect(() => {
+    console.log('EditBookingModal useEffect [isOpen, booking]:', { 
+      isOpen, 
+      booking,
+      hasBookingDate: booking?.booking_date,
+      bookingDateValue: booking?.booking_date
+    });
+    
     if (isOpen) {
-      reset({
+      const resetValues = {
         id: booking.id,
         name: booking.name,
         pickup_location: booking.pickup_location,
@@ -126,14 +150,12 @@ const EditBookingModal = ({
         tag_id: booking.tag_id || '',
         booking_date: booking.booking_date,
         time_slot: booking.time_slot,
-      });
+      };
+      console.log('EditBookingModal resetting form with:', resetValues);
+      
+      reset(resetValues);
       setSelectedTimeSlot(booking.time_slot);
-      try {
-        setDate(parseISO(booking.booking_date));
-      } catch (error) {
-        console.error('Error parsing date on reset:', error);
-        setDate(new Date());
-      }
+      setDate(null); // Reset date state to null to use original booking date
     }
   }, [booking, isOpen, reset]);
 
@@ -150,29 +172,48 @@ const EditBookingModal = ({
   });
 
   const { data: availablePilotsForTime = {}, isLoading: isPilotsLoading } = useQuery({
-    queryKey: ['available-pilots-count', formattedDate],
-    enabled: !!formattedDate,
+    queryKey: ['available-pilots-count', booking.booking_date],
+    enabled: true,
     queryFn: async () => {
-      console.log('Fetching pilots for date:', formattedDate);
+      console.log('Fetching pilots and bookings for date:', formattedDate);
       
-      const { data: availabilities, error } = await supabase
+      // Get available pilots
+      const { data: availabilities, error: availError } = await supabase
         .from('pilot_availability')
         .select('time_slot, pilot_id')
-        .eq('day', formattedDate);
+        .eq('day', date ? formattedDate : booking.booking_date);
 
-      if (error) {
-        console.error('Error fetching availabilities:', error);
-        throw error;
+      if (availError) {
+        console.error('Error fetching availabilities:', availError);
+        throw availError;
       }
 
-      console.log('Received availabilities:', availabilities);
+      // Get existing bookings
+      const { data: bookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('time_slot, number_of_people')
+        .eq('booking_date', date ? formattedDate : booking.booking_date);
 
+      if (bookingsError) {
+        console.error('Error fetching bookings:', bookingsError);
+        throw bookingsError;
+      }
+
+      console.log('Received data:', { availabilities, bookings });
+
+      // Calculate available pilots per time slot
       const pilotCounts: Record<string, number> = {};
       TIMES.forEach(time => {
-        pilotCounts[time] = availabilities?.filter(a => a.time_slot === time).length || 0;
+        const totalPilots = availabilities?.filter(a => a.time_slot === time).length || 0;
+        const bookedPeople = bookings
+          ?.filter(b => b.time_slot === time)
+          .reduce((sum, b) => sum + b.number_of_people, 0) || 0;
+        
+        // Available pilots is total pilots minus booked people
+        pilotCounts[time] = Math.max(0, totalPilots - bookedPeople);
       });
 
-      console.log('Calculated pilot counts:', pilotCounts);
+      console.log('Calculated available pilot counts:', pilotCounts);
       return pilotCounts;
     }
   });
@@ -198,18 +239,82 @@ const EditBookingModal = ({
       if (assignedPilotIds.length === 0) return [];
       
       const { data, error } = await supabase
-        .from('profiles')
-        .select('id, username, gender')
-        .in('id', assignedPilotIds);
+        .from('pilot_assignments')
+        .select(`
+          pilot_id,
+          payment_amount,
+          receipt_url,
+          profiles:pilot_id (
+            id,
+            username,
+            gender
+          )
+        `)
+        .eq('booking_id', booking.id)
+        .in('pilot_id', assignedPilotIds);
 
       if (error) throw error;
-      return data || [];
+      
+      return data.map(d => ({
+        ...d.profiles,
+        payment_amount: d.payment_amount,
+        receipt_url: d.receipt_url
+      })) || [];
     }
   });
 
+  useEffect(() => {
+    let channel: RealtimeChannel;
+
+    const setupRealtimeSubscription = () => {
+      channel = supabase
+        .channel('edit-booking-modal-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'pilot_availability'
+          },
+          () => {
+            queryClient.refetchQueries({
+              queryKey: ['available-pilots', date ? formattedDate : booking.booking_date, selectedTimeSlot]
+            });
+            queryClient.refetchQueries({
+              queryKey: ['available-pilots-count', booking.booking_date]
+            });
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'bookings'
+          },
+          () => {
+            queryClient.refetchQueries({
+              queryKey: ['available-pilots-count', booking.booking_date]
+            });
+          }
+        )
+        .subscribe();
+    };
+
+    if (isOpen) {
+      setupRealtimeSubscription();
+    }
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [isOpen, formattedDate, queryClient, date, booking.booking_date, selectedTimeSlot]);
+
   const { data: availablePilots = [] } = useQuery({
-    queryKey: ['available-pilots', formattedDate, selectedTimeSlot],
-    enabled: !!formattedDate && !!selectedTimeSlot,
+    queryKey: ['available-pilots', date ? formattedDate : booking.booking_date, selectedTimeSlot],
+    enabled: !!selectedTimeSlot,
     queryFn: async () => {
       console.log('Fetching available pilots for:', { formattedDate, selectedTimeSlot });
       
@@ -223,7 +328,7 @@ const EditBookingModal = ({
             gender
           )
         `)
-        .eq('day', formattedDate)
+        .eq('day', date ? formattedDate : booking.booking_date)
         .eq('time_slot', selectedTimeSlot);
 
       if (availabilitiesError) throw availabilitiesError;
@@ -258,9 +363,14 @@ const EditBookingModal = ({
 
   const handleDateChange = (newDate: Date | undefined) => {
     if (newDate) {
-      setDate(newDate);
       const formattedNewDate = format(newDate, 'yyyy-MM-dd');
-      setValue('booking_date', formattedNewDate, { shouldValidate: true, shouldDirty: true });
+      if (formattedNewDate !== booking.booking_date) {
+        setDate(newDate);
+        setValue('booking_date', formattedNewDate, { 
+          shouldValidate: true, 
+          shouldDirty: true 
+        });
+      }
       setIsCalendarOpen(false);
     }
   };
@@ -269,6 +379,17 @@ const EditBookingModal = ({
     try {
       setIsSubmitting(true);
       console.log('EditBookingModal - Submitting form with data:', data);
+
+      // Check pilot availability before proceeding
+      const availableCount = availablePilotsForTime[selectedTimeSlot] || 0;
+      if (availableCount < booking.number_of_people) {
+        toast({
+          variant: "destructive",
+          title: "Insufficient Pilots",
+          description: `This time slot only has ${availableCount} pilot${availableCount === 1 ? '' : 's'} available. You need ${booking.number_of_people}.`,
+        });
+        return;
+      }
 
       const isValid = await trigger();
       if (!isValid) {
@@ -281,20 +402,86 @@ const EditBookingModal = ({
         return;
       }
 
+      console.log('EditBookingModal - Preparing submission data:', {
+        formData: data,
+        date,
+        formattedDate,
+        originalDate: booking.booking_date,
+        selectedTimeSlot,
+        isDirty,
+        errors
+      });
+
+      // Always use the original booking date unless explicitly changed
       const submissionData = {
         ...data,
-        booking_date: formattedDate,
+        booking_date: date ? formattedDate : booking.booking_date,
         time_slot: selectedTimeSlot,
       };
 
-      console.log('EditBookingModal - Submitting with data:', submissionData);
+      console.log('EditBookingModal - Final submission data:', submissionData);
       await onSubmit(submissionData);
       
+      // Immediately refetch queries for both old and new dates
+      if (date && formattedDate !== booking.booking_date) {
+        await queryClient.refetchQueries({ 
+          queryKey: ['daily-plan', booking.booking_date],
+          type: 'active'
+        });
+      }
+      await queryClient.refetchQueries({ 
+        queryKey: ['daily-plan', submissionData.booking_date],
+        type: 'active'
+      });
+      
+      // Wait for queries to complete before navigating
+      await queryClient.refetchQueries({
+        queryKey: ['bookings', submissionData.booking_date],
+        type: 'active'
+      });
+
       reset(submissionData);
       onClose();
       
+      // Navigate to the new date if it changed
+      if (date && formattedDate !== booking.booking_date) {
+        // Invalidate queries for both old and new dates
+        await Promise.all([
+          queryClient.invalidateQueries({ 
+            queryKey: ['daily-plan', booking.booking_date],
+            type: 'active'
+          }),
+          queryClient.invalidateQueries({ 
+            queryKey: ['daily-plan', submissionData.booking_date],
+            type: 'active'
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ['bookings', submissionData.booking_date],
+            type: 'active'
+          })
+        ]);
+        
+        // Close modal and navigate to new date
+        onClose();
+        window.location.href = `/daily-plan?date=${submissionData.booking_date}`;
+        return;
+      }
+      
+      // For same date changes, just invalidate queries and close
+      await Promise.all([
+        queryClient.invalidateQueries({ 
+          queryKey: ['daily-plan', submissionData.booking_date],
+          type: 'active'
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['bookings', submissionData.booking_date],
+          type: 'active'
+        })
+      ]);
+      onClose();
+      
       toast({
-        title: "Success",
+        title: "Success", 
         description: "Booking updated successfully",
       });
     } catch (error) {
@@ -309,13 +496,27 @@ const EditBookingModal = ({
     }
   };
 
-  const handlePilotAssignment = async (pilotId: string) => {
+  const handlePilotAssignment = async (pilotId: string, paymentAmount?: number, receiptFile?: File) => {
     try {
+      let receiptUrl = '';
+      
+      if (receiptFile) {
+        const { data: uploadData, error: uploadError } = await supabase
+          .storage
+          .from('receipts')
+          .upload(`receipts/${booking.id}/${pilotId}/${receiptFile.name}`, receiptFile);
+        
+        if (uploadError) throw uploadError;
+        receiptUrl = uploadData.path;
+      }
+
       const { error } = await supabase
         .from('pilot_assignments')
         .insert({
           booking_id: booking.id,
-          pilot_id: pilotId
+          pilot_id: pilotId,
+          payment_amount: paymentAmount,
+          receipt_url: receiptUrl
         });
 
       if (error) throw error;
@@ -392,7 +593,7 @@ const EditBookingModal = ({
                       className="w-full justify-start text-left font-normal"
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {date ? format(date, 'PPP') : 'Pick a date'}
+                      {date ? format(date, 'PPP') : (booking?.booking_date ? format(parseISO(booking.booking_date), 'PPP') : 'Pick a date')}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -563,37 +764,149 @@ const EditBookingModal = ({
               
               <div className="space-y-2">
                 {assignedPilots.map((pilot) => (
-                  <div key={pilot.id} className="flex items-center justify-between p-2 border rounded">
-                    <span>{pilot.username}</span>
-                    <Button 
-                      variant="destructive" 
-                      size="sm"
-                      onClick={() => handlePilotUnassignment(pilot.id)}
-                    >
-                      Remove
-                    </Button>
+                  <div key={pilot.id} className="flex flex-col gap-2 p-2 border rounded">
+                    <div className="flex items-center justify-between">
+                      <span>{pilot.username}</span>
+                      <Button 
+                        variant="destructive" 
+                        size="sm"
+                        onClick={() => handlePilotUnassignment(pilot.id)}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Input
+                        type="number"
+                        placeholder="Payment amount"
+                        value={paymentAmounts[pilot.id] ?? pilot.payment_amount ?? ''}
+                        onChange={(e) => {
+                          const value = e.target.value ? parseFloat(e.target.value) : undefined;
+                          setPaymentAmounts(prev => ({
+                            ...prev,
+                            [pilot.id]: value as number
+                          }));
+                        }}
+                      />
+                      <Button
+                        variant="outline"
+                        className="bg-blue-500 text-white hover:bg-blue-600"
+                        onClick={() => {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.accept = 'image/*';
+                          input.onchange = (e) => {
+                            const file = (e.target as HTMLInputElement).files?.[0];
+                            if (file) {
+                              supabase
+                                .storage
+                                .from('receipts')
+                                .upload(`receipts/${booking.id}/${pilot.id}/${file.name}`, file)
+                                .then(({ data }) => {
+                                  if (data) {
+                                    supabase
+                                      .from('pilot_assignments')
+                                      .update({ receipt_url: data.path })
+                                      .eq('booking_id', booking.id)
+                                      .eq('pilot_id', pilot.id);
+                                  }
+                                });
+                            }
+                          };
+                          input.click();
+                        }}
+                      >
+                        Upload Receipt
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
+              <div className="flex justify-end">
+                <Button
+                  onClick={async () => {
+                    try {
+                      setIsSavingPayments(true);
+                      
+                      const updates = assignedPilots
+                        .filter(pilot => paymentAmounts[pilot.id] !== undefined)
+                        .map(pilot => 
+                          supabase
+                            .from('pilot_assignments')
+                            .update({ payment_amount: paymentAmounts[pilot.id] })
+                            .eq('booking_id', booking.id)
+                            .eq('pilot_id', pilot.id)
+                        );
+
+                      if (updates.length === 0) {
+                        toast({
+                          title: "No Changes",
+                          description: "No payment amounts to update",
+                        });
+                        return;
+                      }
+
+                      const results = await Promise.all(updates);
+                      const errors = results.filter(r => r.error).map(r => r.error);
+                      if (errors.length > 0) {
+                        throw new Error(errors[0]?.message || 'Failed to save payments');
+                      }
+
+                      // Invalidate queries to refresh data
+                      await queryClient.invalidateQueries({ 
+                        queryKey: ['assigned-pilots', assignedPilotIds]
+                      });
+                      
+                      toast({
+                        title: "Success",
+                        description: "Payments saved successfully",
+                      });
+
+                      // Reset payment amounts state to reflect saved state
+                      setPaymentAmounts({});
+                    } catch (error) {
+                      console.error('Error saving payments:', error);
+                      toast({
+                        variant: "destructive",
+                        title: "Error",
+                        description: error instanceof Error ? error.message : "Failed to save payments",
+                      });
+                    } finally {
+                      setIsSavingPayments(false);
+                    }
+                  }}
+                  disabled={isSavingPayments}
+                >
+                  {isSavingPayments ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save'
+                  )}
+                </Button>
+              </div>
 
               <div className="space-y-2">
-                <h3 className="text-lg font-medium">Available Pilots</h3>
-                {availablePilots
-                  .filter(pilot => !assignedPilots.some(ap => ap.id === pilot.id))
-                  .map((pilot) => (
-                    <div key={pilot.id} className="flex items-center justify-between p-2 border rounded">
-                      <span>{pilot.username}</span>
-                      <Button 
-                        variant="secondary" 
-                        size="sm"
-                        onClick={() => handlePilotAssignment(pilot.id)}
-                        disabled={assignedPilots.length >= booking.number_of_people}
-                      >
-                        Assign
-                      </Button>
-                    </div>
-                  ))
-                }
+                <Select
+                  onValueChange={(pilotId) => handlePilotAssignment(pilotId)}
+                  disabled={assignedPilots.length >= booking.number_of_people}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a pilot to assign" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availablePilots
+                      .filter(pilot => !assignedPilots.some(ap => ap.id === pilot.id))
+                      .map((pilot) => (
+                        <SelectItem key={pilot.id} value={pilot.id}>
+                          {pilot.username}
+                        </SelectItem>
+                      ))
+                    }
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </TabsContent>

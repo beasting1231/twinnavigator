@@ -17,7 +17,7 @@ const Auth = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Add timeout for loading state
+  // Show loading state only after a delay
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     
@@ -29,7 +29,7 @@ const Auth = () => {
           title: "Request timeout",
           description: "The request took too long. Please try again.",
         });
-      }, 10000); // 10 second timeout
+      }, 15000); // Match AUTH_TIMEOUT from useAuth
     }
 
     return () => {
@@ -48,36 +48,32 @@ const Auth = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loading) return; // Prevent double submission
+    if (loading) return;
 
     try {
-      setLoading(true);
-      console.log('Auth - Starting authentication process');
-
       if (!email || !password) {
         throw new Error("Please fill in all fields");
       }
 
+      setLoading(true);
+
       if (isLogin) {
         await signIn(email, password);
-        toast({
-          title: "Welcome back!",
-          description: "You've successfully logged in.",
-        });
+        // Toast is handled by useAuth
       } else {
         await signUp(email, password);
-        toast({
-          title: "Account created",
-          description: "Please check your email to verify your account",
-        });
+        // Toast is handled by useAuth
       }
     } catch (error: any) {
-      console.error("Authentication error:", error);
-      toast({
-        variant: "destructive",
-        title: "Authentication error",
-        description: error.message || "An error occurred during authentication",
-      });
+      // Only show toast if it's a validation error (not from useAuth)
+      if (error.message === "Please fill in all fields") {
+        toast({
+          variant: "destructive",
+          title: "Validation error",
+          description: error.message,
+        });
+      }
+      // Other errors are handled by useAuth
     } finally {
       setLoading(false);
     }

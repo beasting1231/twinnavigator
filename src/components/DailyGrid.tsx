@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { format } from "date-fns";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -27,6 +26,14 @@ interface PilotAvailability {
   };
 }
 
+interface AssignedPilot {
+  pilot_id: string;
+  profiles: {
+    username: string | null;
+    id: string;
+  };
+}
+
 interface Booking {
   id: string;
   name: string;
@@ -42,6 +49,11 @@ interface Booking {
     color: string;
     name: string;
   } | null;
+  profiles?: {
+    username: string | null;
+    id: string;
+  };
+  pilot_assignments?: AssignedPilot[];
 }
 
 interface Pilot {
@@ -93,7 +105,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
             table: 'pilot_availability'
           },
           () => {
-            queryClient.invalidateQueries({
+            queryClient.refetchQueries({
               queryKey: ['daily-plan', formattedDate]
             });
           }
@@ -106,7 +118,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
             table: 'bookings'
           },
           () => {
-            queryClient.invalidateQueries({
+            queryClient.refetchQueries({
               queryKey: ['bookings', formattedDate]
             });
           }
@@ -144,7 +156,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         `)
         .eq('day', formattedDate);
 
-      if (error) {
+      if ( error) {
         console.error('Error fetching availabilities:', error);
         throw error;
       }
@@ -160,6 +172,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
   const { data: bookingsData } = useQuery({
     queryKey: ['bookings', formattedDate],
     queryFn: async () => {
+      console.log('Fetching bookings for date:', formattedDate);
       const { data, error } = await supabase
         .from('bookings')
         .select(`
@@ -170,15 +183,28 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
           pilot_id,
           time_slot,
           tag_id,
+          booking_date,
           tags (
             color,
             name
+          ),
+          profiles!bookings_pilot_id_fkey (
+            username,
+            id
+          ),
+          pilot_assignments (
+            pilot_id,
+            profiles!pilot_assignments_pilot_id_fkey (
+              username,
+              id
+            )
           )
         `)
         .eq('booking_date', formattedDate)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
+      console.log('Received bookings:', data);
       return data as Booking[];
     }
   });
@@ -437,13 +463,13 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
             </div>
           ))}
 
-          {TIMES.map((time) => (
-            <React.Fragment key={time}>
-              <div className="py-2 font-medium text-muted-foreground text-xs whitespace-nowrap">
-                {time}
-              </div>
+              {TIMES.map((time) => (
+                <React.Fragment key={time}>
+                  <div className="py-2 font-medium text-muted-foreground text-xs whitespace-nowrap">
+                    {time}
+                  </div>
 
-              {getTimeSlotData(time).map((slot, index) => {
+                  {getTimeSlotData(time).map((slot, index) => {
                 if (slot.type === 'hidden' || slot.type === 'empty') return null;
                 
                 const slotWidth = slot.type === 'booking' 
@@ -453,7 +479,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
                 return (
                   <div 
                     key={index} 
-                    className="h-[50px] relative"
+                    className="h-[70px] relative"
                     style={{
                       width: slotWidth,
                       gridColumn: slot.type === 'booking' ? `span ${slot.width}` : undefined
@@ -461,32 +487,51 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
                   >
                     {slot.type === 'booking' && (
                       <div 
-                        className="rounded-lg p-2 text-sm font-medium h-full cursor-pointer hover:opacity-90"
+                        className="rounded-lg p-2 text-sm font-medium h-full cursor-pointer hover:opacity-90 flex flex-col justify-between"
                         style={{ 
                           backgroundColor: slot.booking.tags?.color || '#1EAEDB',
                           width: '100%'
                         }}
-                        onClick={() => setSelectedBooking(slot.booking)}
+                        onClick={() => {
+                          console.log('Clicked booking:', {
+                            booking: slot.booking,
+                            hasBookingDate: 'booking_date' in slot.booking,
+                            bookingDate: slot.booking.booking_date
+                          });
+                          setSelectedBooking(slot.booking);
+                        }}
                       >
-                        <div className="absolute top-1 right-1 bg-gray-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
-                          {slot.booking.number_of_people}
+                        <div>
+                          <div className="absolute top-1 right-1 bg-gray-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
+                            {slot.booking.number_of_people}
+                          </div>
+                          <div className="flex flex-col text-white text-xs">
+                            <span className="font-medium truncate">{slot.booking.name}</span>
+                            <span className="truncate">{slot.booking.pickup_location}</span>
+                          </div>
                         </div>
-                        <div className="flex flex-col text-white text-xs">
-                          <span className="font-medium truncate">{slot.booking.name}</span>
-                          <span className="truncate">{slot.booking.pickup_location}</span>
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          <div className="bg-black/30 px-1.5 py-0.5 rounded text-[10px] font-medium text-white truncate">
+                            {slot.booking.profiles?.username || 'Unknown Pilot'}
+                          </div>
+                          {slot.booking.pilot_assignments?.map(pilot => (
+                            <div key={pilot.pilot_id} className="bg-black/30 px-1.5 py-0.5 rounded text-[10px] font-medium text-white truncate">
+                              {pilot.profiles.username || 'Unknown Pilot'}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
                     {slot.type === 'available' && (
                       <div 
-                        className="bg-white rounded-lg p-2 text-sm font-medium text-center h-full cursor-pointer hover:bg-gray-50 w-[180px]"
+                        className="bg-white rounded-lg p-2 text-sm font-medium text-center h-[70px] cursor-pointer hover:bg-gray-50 w-[180px] flex items-center justify-center"
                         onClick={() => setSelectedSlot({ time, pilotId: slot.pilot.id })}
                       >
                         Available
                       </div>
                     )}
                     {slot.type === 'unavailable' && (
-                      <div className="bg-gray-700 rounded-lg p-2 text-sm font-medium text-center text-white h-full w-[180px]">
+                      <div className="bg-gray-700 rounded-lg p-2 text-sm font-medium text-center text-white h-[70px] w-[180px] flex items-center justify-center">
                         No {slot.pilot.name}
                       </div>
                     )}
