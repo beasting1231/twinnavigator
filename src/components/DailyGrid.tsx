@@ -511,9 +511,6 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-1 mt-1.5">
-                          <div className="bg-black/30 px-1.5 py-0.5 rounded text-[10px] font-medium text-white truncate">
-                            {slot.booking.profiles?.username || 'Unknown Pilot'}
-                          </div>
                           {slot.booking.pilot_assignments?.map(pilot => (
                             <div key={pilot.pilot_id} className="bg-black/30 px-1.5 py-0.5 rounded text-[10px] font-medium text-white truncate">
                               {pilot.profiles.username || 'Unknown Pilot'}
