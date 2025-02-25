@@ -327,14 +327,16 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
                       className="min-h-[40px]"
                       onClick={() => isPilot && handleAvailabilityToggle(day.date, time)}
                     >
-                      {isAvailable && (
-                        <div className="bg-green-500/20 text-green-700 rounded-lg p-2 text-sm font-medium text-center cursor-pointer hover:bg-green-500/30">
-                          Available
-                        </div>
-                      )}
-                      {!isAvailable && isPilot && (
-                        <div className="bg-red-500/10 text-red-700 rounded-lg p-2 text-sm font-medium text-center cursor-pointer hover:bg-red-500/20">
-                          Unavailable
+                      {isPilot && (
+                        <div 
+                          className={cn(
+                            "rounded-lg p-2 text-sm font-medium text-center cursor-pointer transition-colors",
+                            isAvailable 
+                              ? "bg-green-500/20 text-green-700 hover:bg-green-500/30" 
+                              : "bg-red-500/10 text-red-700 hover:bg-red-500/20"
+                          )}
+                        >
+                          {time}
                         </div>
                       )}
                     </div>
@@ -343,6 +345,10 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
               </div>
             </React.Fragment>
           ))}
+        </div>
+
+        <div className="mt-4 text-center text-muted-foreground">
+          Selected Day: {selectedDate.toDateString()}
         </div>
       </div>
     </div>
