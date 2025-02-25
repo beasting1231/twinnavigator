@@ -31,7 +31,7 @@ const TopBar = ({ pageTitle }: TopBarProps) => {
         <Button 
           className="bg-gradient-to-r from-[#9b87f5] to-[#7E69AB] text-white shadow-lg hover:opacity-90"
           onClick={() => {
-            const dateNavigatorDate = document.querySelector('[aria-label="Selected date"]');
+            const dateNavigatorDate = document.querySelector('[aria-label="Selected date"]') as HTMLElement;
             if (dateNavigatorDate) {
               dateNavigatorDate.click();
             }
