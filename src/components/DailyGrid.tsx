@@ -437,7 +437,6 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
   const selectedDay = format(selectedDate, "EEEE MMM d").toUpperCase();
 
-  // Changed to 45px which is the minimum width needed for the time text
   const gridColumns = `45px ${availablePilots.map(() => 'minmax(180px, 180px)').join(' ')}`;
 
   return (
@@ -463,13 +462,13 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
             </div>
           ))}
 
-              {TIMES.map((time) => (
-                <React.Fragment key={time}>
-                  <div className="py-2 font-medium text-muted-foreground text-xs whitespace-nowrap">
-                    {time}
-                  </div>
+          {TIMES.map((time) => (
+            <React.Fragment key={time}>
+              <div className="py-2 font-medium text-muted-foreground text-xs whitespace-nowrap">
+                {time}
+              </div>
 
-                  {getTimeSlotData(time).map((slot, index) => {
+              {getTimeSlotData(time).map((slot, index) => {
                 if (slot.type === 'hidden' || slot.type === 'empty') return null;
                 
                 const slotWidth = slot.type === 'booking' 
@@ -510,13 +509,20 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
                             <span className="truncate">{slot.booking.pickup_location}</span>
                           </div>
                         </div>
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                          {slot.booking.pilot_assignments?.map(pilot => (
-                            <div key={pilot.pilot_id} className="bg-black/30 px-1.5 py-0.5 rounded text-[10px] font-medium text-white truncate">
-                              {pilot.profiles.username || 'Unknown Pilot'}
+                        {slot.booking.pilot_assignments && slot.booking.pilot_assignments.length > 0 && (
+                          <div className="w-[90%] mx-auto mt-1.5">
+                            <div className="flex flex-wrap gap-1 justify-start">
+                              {slot.booking.pilot_assignments?.map(pilot => (
+                                <div 
+                                  key={pilot.pilot_id} 
+                                  className="bg-black/30 px-2 py-1 rounded text-[10px] font-medium text-white truncate flex-grow basis-[calc(50%-0.25rem)]"
+                                >
+                                  {pilot.profiles.username || 'Unknown Pilot'}
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     )}
                     {slot.type === 'available' && (
