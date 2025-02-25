@@ -511,11 +511,11 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
                         </div>
                         {slot.booking.pilot_assignments && slot.booking.pilot_assignments.length > 0 && (
                           <div className="w-[90%] mx-auto mt-1.5">
-                            <div className="flex flex-wrap gap-1 justify-start">
+                            <div className="grid grid-cols-2 gap-1">
                               {slot.booking.pilot_assignments?.map(pilot => (
                                 <div 
                                   key={pilot.pilot_id} 
-                                  className="bg-black/30 px-2 py-1 rounded text-[10px] font-medium text-white truncate flex-grow basis-[calc(50%-0.25rem)]"
+                                  className="bg-black/30 px-2 py-1 rounded text-[10px] font-medium text-white truncate text-center"
                                 >
                                   {pilot.profiles.username || 'Unknown Pilot'}
                                 </div>
