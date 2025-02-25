@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -74,6 +75,10 @@ const BookingModal = ({
   timeSlot,
   maxPeople 
 }: BookingModalProps) => {
+  const [date, setDate] = React.useState<Date | undefined>(
+    selectedDate ? new Date(selectedDate) : undefined
+  );
+  
   const { 
     register, 
     handleSubmit, 
@@ -110,8 +115,16 @@ const BookingModal = ({
   React.useEffect(() => {
     if (!isOpen) {
       reset();
+      setDate(undefined);
     }
   }, [isOpen, reset]);
+
+  const handleDateSelect = (newDate: Date | undefined) => {
+    setDate(newDate);
+    if (newDate) {
+      setValue('booking_date', format(newDate, 'yyyy-MM-dd'));
+    }
+  };
 
   const watchedDate = watch("booking_date");
 
@@ -167,18 +180,18 @@ const BookingModal = ({
                   variant="outline"
                   className={cn(
                     "w-full justify-start text-left font-normal mt-1",
-                    !watchedDate && "text-muted-foreground"
+                    !date && "text-muted-foreground"
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {watchedDate ? format(new Date(watchedDate), "PPP") : <span>Pick a date</span>}
+                  {date ? format(date, "PPP") : <span>Pick a date</span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
                   mode="single"
-                  selected={watchedDate ? new Date(watchedDate) : undefined}
-                  onSelect={(date) => setValue('booking_date', date ? format(date, 'yyyy-MM-dd') : '')}
+                  selected={date}
+                  onSelect={handleDateSelect}
                   initialFocus
                 />
               </PopoverContent>
@@ -190,7 +203,10 @@ const BookingModal = ({
 
           <div>
             <Label>Time *</Label>
-            <Select onValueChange={(value) => setValue('time_slot', value)}>
+            <Select 
+              onValueChange={(value) => setValue('time_slot', value)}
+              defaultValue={timeSlot}
+            >
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder="Select a time" />
               </SelectTrigger>
