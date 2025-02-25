@@ -1,12 +1,17 @@
+
 import TopBar from "@/components/TopBar";
 import DateNavigator from "@/components/DateNavigator";
 import DailyGrid from "@/components/DailyGrid";
 import BookingModal from "@/components/BookingModal";
 import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
 
 const DailyPlan = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [isNewBookingModalOpen, setIsNewBookingModalOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     // Find and remove any existing viewport meta tag
