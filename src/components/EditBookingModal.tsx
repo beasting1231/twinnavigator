@@ -3,16 +3,16 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { format, parseISO } from 'date-fns';
-import { CalendarIcon, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Select,
   SelectContent,
@@ -26,7 +26,6 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
@@ -75,24 +74,15 @@ const EditBookingModal = ({
   booking,
   maxPeople 
 }: EditBookingModalProps) => {
-  console.log('EditBookingModal render:', { 
-    booking, 
-    isOpen,
-    hasBookingDate: booking?.booking_date,
-    bookingDateValue: booking?.booking_date
-  });
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = React.useState(booking.time_slot);
-  const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
   const [isSavingPayments, setIsSavingPayments] = React.useState(false);
   const [paymentAmounts, setPaymentAmounts] = React.useState<Record<string, number>>({});
-  
-  const [date, setDate] = React.useState<Date | null>(null);
-
-  const formattedDate = date ? format(date, 'yyyy-MM-dd') : booking?.booking_date;
-  console.log('EditBookingModal formattedDate:', { date, formattedDate, originalDate: booking?.booking_date });
+  const [date, setDate] = React.useState<Date | undefined>(
+    booking?.booking_date ? new Date(booking.booking_date) : undefined
+  );
 
   const { 
     register, 
@@ -104,20 +94,6 @@ const EditBookingModal = ({
     trigger,
   } = useForm<BookingFormData>({
     resolver: zodResolver(bookingSchema),
-    defaultValues: {
-      id: booking.id,
-      name: booking.name,
-      pickup_location: booking.pickup_location,
-      number_of_people: booking.number_of_people,
-      phone: booking.phone || '',
-      email: booking.email || '',
-      tag_id: booking.tag_id || '',
-      booking_date: booking.booking_date,
-      time_slot: booking.time_slot,
-    }
-  });
-
-  console.log('EditBookingModal form initialized:', { 
     defaultValues: {
       id: booking.id,
       name: booking.name,
@@ -155,7 +131,7 @@ const EditBookingModal = ({
       
       reset(resetValues);
       setSelectedTimeSlot(booking.time_slot);
-      setDate(null); // Reset date state to null to use original booking date
+      setDate(booking?.booking_date ? new Date(booking.booking_date) : undefined);
     }
   }, [booking, isOpen, reset]);
 
@@ -175,13 +151,13 @@ const EditBookingModal = ({
     queryKey: ['available-pilots-count', booking.booking_date],
     enabled: true,
     queryFn: async () => {
-      console.log('Fetching pilots and bookings for date:', formattedDate);
+      console.log('Fetching pilots and bookings for date:', booking.booking_date);
       
       // Get available pilots
       const { data: availabilities, error: availError } = await supabase
         .from('pilot_availability')
         .select('time_slot, pilot_id')
-        .eq('day', date ? formattedDate : booking.booking_date);
+        .eq('day', booking.booking_date);
 
       if (availError) {
         console.error('Error fetching availabilities:', availError);
@@ -192,7 +168,7 @@ const EditBookingModal = ({
       const { data: bookings, error: bookingsError } = await supabase
         .from('bookings')
         .select('time_slot, number_of_people')
-        .eq('booking_date', date ? formattedDate : booking.booking_date);
+        .eq('booking_date', booking.booking_date);
 
       if (bookingsError) {
         console.error('Error fetching bookings:', bookingsError);
@@ -278,7 +254,7 @@ const EditBookingModal = ({
           },
           () => {
             queryClient.refetchQueries({
-              queryKey: ['available-pilots', date ? formattedDate : booking.booking_date, selectedTimeSlot]
+              queryKey: ['available-pilots', booking.booking_date, selectedTimeSlot]
             });
             queryClient.refetchQueries({
               queryKey: ['available-pilots-count', booking.booking_date]
@@ -310,13 +286,13 @@ const EditBookingModal = ({
         supabase.removeChannel(channel);
       }
     };
-  }, [isOpen, formattedDate, queryClient, date, booking.booking_date, selectedTimeSlot]);
+  }, [isOpen, booking.booking_date, queryClient, selectedTimeSlot]);
 
   const { data: availablePilots = [] } = useQuery({
-    queryKey: ['available-pilots', date ? formattedDate : booking.booking_date, selectedTimeSlot],
+    queryKey: ['available-pilots', booking.booking_date, selectedTimeSlot],
     enabled: !!selectedTimeSlot,
     queryFn: async () => {
-      console.log('Fetching available pilots for:', { formattedDate, selectedTimeSlot });
+      console.log('Fetching available pilots for:', { bookingDate: booking.booking_date, selectedTimeSlot });
       
       const { data: availabilities, error: availabilitiesError } = await supabase
         .from('pilot_availability')
@@ -328,7 +304,7 @@ const EditBookingModal = ({
             gender
           )
         `)
-        .eq('day', date ? formattedDate : booking.booking_date)
+        .eq('day', booking.booking_date)
         .eq('time_slot', selectedTimeSlot);
 
       if (availabilitiesError) throw availabilitiesError;
@@ -362,16 +338,13 @@ const EditBookingModal = ({
   };
 
   const handleDateChange = (newDate: Date | undefined) => {
+    setDate(newDate);
     if (newDate) {
-      const formattedNewDate = format(newDate, 'yyyy-MM-dd');
-      if (formattedNewDate !== booking.booking_date) {
-        setDate(newDate);
-        setValue('booking_date', formattedNewDate, { 
-          shouldValidate: true, 
-          shouldDirty: true 
-        });
-      }
-      setIsCalendarOpen(false);
+      const formattedDate = format(newDate, 'yyyy-MM-dd');
+      setValue('booking_date', formattedDate, { 
+        shouldValidate: true, 
+        shouldDirty: true 
+      });
     }
   };
 
@@ -405,81 +378,15 @@ const EditBookingModal = ({
       console.log('EditBookingModal - Preparing submission data:', {
         formData: data,
         date,
-        formattedDate,
-        originalDate: booking.booking_date,
+        bookingDate: booking.booking_date,
         selectedTimeSlot,
         isDirty,
         errors
       });
 
-      // Always use the original booking date unless explicitly changed
-      const submissionData = {
-        ...data,
-        booking_date: date ? formattedDate : booking.booking_date,
-        time_slot: selectedTimeSlot,
-      };
-
-      console.log('EditBookingModal - Final submission data:', submissionData);
-      await onSubmit(submissionData);
-      
-      // Immediately refetch queries for both old and new dates
-      if (date && formattedDate !== booking.booking_date) {
-        await queryClient.refetchQueries({ 
-          queryKey: ['daily-plan', booking.booking_date],
-          type: 'active'
-        });
-      }
-      await queryClient.refetchQueries({ 
-        queryKey: ['daily-plan', submissionData.booking_date],
-        type: 'active'
-      });
-      
-      // Wait for queries to complete before navigating
-      await queryClient.refetchQueries({
-        queryKey: ['bookings', submissionData.booking_date],
-        type: 'active'
-      });
-
-      reset(submissionData);
+      await onSubmit(data);
+      reset();
       onClose();
-      
-      // Navigate to the new date if it changed
-      if (date && formattedDate !== booking.booking_date) {
-        // Invalidate queries for both old and new dates
-        await Promise.all([
-          queryClient.invalidateQueries({ 
-            queryKey: ['daily-plan', booking.booking_date],
-            type: 'active'
-          }),
-          queryClient.invalidateQueries({ 
-            queryKey: ['daily-plan', submissionData.booking_date],
-            type: 'active'
-          }),
-          queryClient.invalidateQueries({
-            queryKey: ['bookings', submissionData.booking_date],
-            type: 'active'
-          })
-        ]);
-        
-        // Close modal and navigate to new date
-        onClose();
-        window.location.href = `/daily-plan?date=${submissionData.booking_date}`;
-        return;
-      }
-      
-      // For same date changes, just invalidate queries and close
-      await Promise.all([
-        queryClient.invalidateQueries({ 
-          queryKey: ['daily-plan', submissionData.booking_date],
-          type: 'active'
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ['bookings', submissionData.booking_date],
-          type: 'active'
-        })
-      ]);
-      onClose();
-      
       toast({
         title: "Success", 
         description: "Booking updated successfully",
@@ -585,26 +492,11 @@ const EditBookingModal = ({
               
               <div className="space-y-2">
                 <Label>Date *</Label>
-                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {date ? format(date, 'PPP') : (booking?.booking_date ? format(parseISO(booking.booking_date), 'PPP') : 'Pick a date')}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={date}
-                      onSelect={handleDateChange}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DatePicker
+                  date={date}
+                  onDateChange={handleDateChange}
+                  className="mt-1"
+                />
                 {errors.booking_date && (
                   <p className="text-sm text-destructive">{errors.booking_date.message}</p>
                 )}
