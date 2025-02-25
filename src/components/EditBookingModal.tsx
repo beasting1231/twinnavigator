@@ -476,10 +476,12 @@ const EditBookingModal = ({
     setIsSavingPayments(true);
     try {
       // Delete existing assignments
-      await supabase
+      const { error: deleteError } = await supabase
         .from('pilot_assignments')
         .delete()
         .eq('booking_id', booking.id);
+
+      if (deleteError) throw deleteError;
 
       // Create new assignments
       const assignments = Object.entries(paymentAmounts)
@@ -491,11 +493,11 @@ const EditBookingModal = ({
         }));
 
       if (assignments.length > 0) {
-        const { error } = await supabase
+        const { error: insertError } = await supabase
           .from('pilot_assignments')
           .insert(assignments);
 
-        if (error) throw error;
+        if (insertError) throw insertError;
       }
 
       toast({
@@ -503,9 +505,10 @@ const EditBookingModal = ({
         description: "Pilot assignments updated successfully",
       });
 
-      // Invalidate both the bookings query and the daily-plan query
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['daily-plan'] });
+      // Force a refresh of the bookings data
+      await queryClient.invalidateQueries({
+        queryKey: ['bookings']
+      });
       
     } catch (error) {
       console.error('Error saving pilot assignments:', error);

@@ -1,5 +1,4 @@
-
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { format } from "date-fns";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -98,7 +97,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
 
     const setupRealtimeSubscription = () => {
       channel = supabase
-        .channel('daily-plan-changes')
+        .channel('daily-grid-changes')
         .on(
           'postgres_changes',
           {
@@ -107,7 +106,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
             table: 'pilot_availability'
           },
           () => {
-            queryClient.refetchQueries({
+            queryClient.invalidateQueries({
               queryKey: ['daily-plan', formattedDate]
             });
           }
@@ -120,18 +119,35 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
             table: 'bookings'
           },
           () => {
-            queryClient.refetchQueries({
+            queryClient.invalidateQueries({
               queryKey: ['bookings', formattedDate]
             });
           }
         )
-        .subscribe();
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'pilot_assignments'
+          },
+          () => {
+            console.log('Pilot assignment changed, invalidating bookings query');
+            queryClient.invalidateQueries({
+              queryKey: ['bookings', formattedDate]
+            });
+          }
+        )
+        .subscribe((status) => {
+          console.log('Realtime subscription status:', status);
+        });
     };
 
     setupRealtimeSubscription();
 
     return () => {
       if (channel) {
+        console.log('Cleaning up realtime subscription');
         supabase.removeChannel(channel);
       }
     };
@@ -174,7 +190,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
   const { data: bookingsData } = useQuery({
     queryKey: ['bookings', formattedDate],
     queryFn: async () => {
-      console.log('Fetching bookings for date:', formattedDate);
+      console.log('Fetching bookings with pilot assignments');
       const { data, error } = await supabase
         .from('bookings')
         .select(`
@@ -206,7 +222,7 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      console.log('Received bookings:', data);
+      console.log('Fetched bookings:', data);
       return data as Booking[];
     }
   });
