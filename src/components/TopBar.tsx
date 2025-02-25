@@ -3,6 +3,7 @@ import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import SideMenu from "./SideMenu";
 import { useAuth } from "@/hooks/useAuth";
+import { Button } from "./ui/button";
 
 interface TopBarProps {
   pageTitle?: string;
@@ -26,9 +27,23 @@ const TopBar = ({ pageTitle }: TopBarProps) => {
       <span className="absolute left-1/2 -translate-x-1/2 text-white font-medium">
         {pageTitle}
       </span>
-      <span className="px-4 py-2 rounded-lg font-medium bg-gradient-to-r from-[#9b87f5] to-[#7E69AB] text-white shadow-lg">
-        {profile?.username || 'Guest'}
-      </span>
+      {pageTitle === "Daily Plan" ? (
+        <Button 
+          className="bg-gradient-to-r from-[#9b87f5] to-[#7E69AB] text-white shadow-lg hover:opacity-90"
+          onClick={() => {
+            const dateNavigatorDate = document.querySelector('[aria-label="Selected date"]');
+            if (dateNavigatorDate) {
+              dateNavigatorDate.click();
+            }
+          }}
+        >
+          New Booking
+        </Button>
+      ) : (
+        <span className="px-4 py-2 rounded-lg font-medium bg-gradient-to-r from-[#9b87f5] to-[#7E69AB] text-white shadow-lg">
+          {profile?.username || 'Guest'}
+        </span>
+      )}
     </div>
   );
 };
