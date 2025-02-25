@@ -71,24 +71,24 @@ export type Database = {
           booking_id: string | null
           created_at: string
           id: string
-          pilot_id: string | null
           payment_amount: number | null
+          pilot_id: string | null
           receipt_url: string | null
         }
         Insert: {
           booking_id?: string | null
           created_at?: string
           id?: string
-          pilot_id?: string | null
           payment_amount?: number | null
+          pilot_id?: string | null
           receipt_url?: string | null
         }
         Update: {
           booking_id?: string | null
           created_at?: string
           id?: string
-          pilot_id?: string | null
           payment_amount?: number | null
+          pilot_id?: string | null
           receipt_url?: string | null
         }
         Relationships: [
