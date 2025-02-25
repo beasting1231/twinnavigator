@@ -472,6 +472,53 @@ const EditBookingModal = ({
     }
   };
 
+  const handleSavePilotAssignments = async () => {
+    setIsSavingPayments(true);
+    try {
+      // Delete existing assignments
+      await supabase
+        .from('pilot_assignments')
+        .delete()
+        .eq('booking_id', booking.id);
+
+      // Create new assignments
+      const assignments = Object.entries(paymentAmounts)
+        .filter(([_, amount]) => amount > 0)
+        .map(([pilotId, amount]) => ({
+          booking_id: booking.id,
+          pilot_id: pilotId,
+          payment_amount: amount
+        }));
+
+      if (assignments.length > 0) {
+        const { error } = await supabase
+          .from('pilot_assignments')
+          .insert(assignments);
+
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Success",
+        description: "Pilot assignments updated successfully",
+      });
+
+      // Invalidate both the bookings query and the daily-plan query
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['daily-plan'] });
+      
+    } catch (error) {
+      console.error('Error saving pilot assignments:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update pilot assignments",
+      });
+    } finally {
+      setIsSavingPayments(false);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
       if (!open && !isSubmitting) {
@@ -716,57 +763,7 @@ const EditBookingModal = ({
               </div>
               <div className="flex justify-end">
                 <Button
-                  onClick={async () => {
-                    try {
-                      setIsSavingPayments(true);
-                      
-                      const updates = assignedPilots
-                        .filter(pilot => paymentAmounts[pilot.id] !== undefined)
-                        .map(pilot => 
-                          supabase
-                            .from('pilot_assignments')
-                            .update({ payment_amount: paymentAmounts[pilot.id] })
-                            .eq('booking_id', booking.id)
-                            .eq('pilot_id', pilot.id)
-                        );
-
-                      if (updates.length === 0) {
-                        toast({
-                          title: "No Changes",
-                          description: "No payment amounts to update",
-                        });
-                        return;
-                      }
-
-                      const results = await Promise.all(updates);
-                      const errors = results.filter(r => r.error).map(r => r.error);
-                      if (errors.length > 0) {
-                        throw new Error(errors[0]?.message || 'Failed to save payments');
-                      }
-
-                      // Invalidate queries to refresh data
-                      await queryClient.invalidateQueries({ 
-                        queryKey: ['assigned-pilots', assignedPilotIds]
-                      });
-                      
-                      toast({
-                        title: "Success",
-                        description: "Payments saved successfully",
-                      });
-
-                      // Reset payment amounts state to reflect saved state
-                      setPaymentAmounts({});
-                    } catch (error) {
-                      console.error('Error saving payments:', error);
-                      toast({
-                        variant: "destructive",
-                        title: "Error",
-                        description: error instanceof Error ? error.message : "Failed to save payments",
-                      });
-                    } finally {
-                      setIsSavingPayments(false);
-                    }
-                  }}
+                  onClick={handleSavePilotAssignments}
                   disabled={isSavingPayments}
                 >
                   {isSavingPayments ? (
