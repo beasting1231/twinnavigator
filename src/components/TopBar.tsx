@@ -7,9 +7,10 @@ import { Button } from "./ui/button";
 
 interface TopBarProps {
   pageTitle?: string;
+  onNewBookingClick?: () => void;
 }
 
-const TopBar = ({ pageTitle }: TopBarProps) => {
+const TopBar = ({ pageTitle, onNewBookingClick }: TopBarProps) => {
   const { profile } = useAuth();
   
   return (
@@ -30,12 +31,7 @@ const TopBar = ({ pageTitle }: TopBarProps) => {
       {pageTitle === "Daily Plan" ? (
         <Button 
           className="bg-gradient-to-r from-[#9b87f5] to-[#7E69AB] text-white shadow-lg hover:opacity-90"
-          onClick={() => {
-            const dateNavigatorDate = document.querySelector('[aria-label="Selected date"]') as HTMLElement;
-            if (dateNavigatorDate) {
-              dateNavigatorDate.click();
-            }
-          }}
+          onClick={onNewBookingClick}
         >
           New Booking
         </Button>

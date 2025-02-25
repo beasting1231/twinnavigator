@@ -1,11 +1,12 @@
-
 import TopBar from "@/components/TopBar";
 import DateNavigator from "@/components/DateNavigator";
 import DailyGrid from "@/components/DailyGrid";
+import BookingModal from "@/components/BookingModal";
 import { useState, useEffect } from "react";
 
 const DailyPlan = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [isNewBookingModalOpen, setIsNewBookingModalOpen] = useState(false);
 
   useEffect(() => {
     // Find and remove any existing viewport meta tag
@@ -30,13 +31,58 @@ const DailyPlan = () => {
     };
   }, []);
 
+  const handleOpenNewBookingModal = () => {
+    setIsNewBookingModalOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      <TopBar pageTitle="Daily Plan" />
+      <TopBar pageTitle="Daily Plan" onNewBookingClick={handleOpenNewBookingModal} />
       <main className="pt-20 px-4">
         <div className="max-w-7xl mx-auto">
           <DateNavigator date={selectedDate} onDateChange={setSelectedDate} />
           <DailyGrid selectedDate={selectedDate} />
+          <BookingModal
+            isOpen={isNewBookingModalOpen}
+            onClose={() => setIsNewBookingModalOpen(false)}
+            onSubmit={async (data) => {
+              try {
+                const { error } = await supabase
+                  .from('bookings')
+                  .insert([
+                    {
+                      name: data.name,
+                      pickup_location: data.pickup_location,
+                      number_of_people: data.number_of_people,
+                      phone: data.phone,
+                      email: data.email,
+                      tag_id: data.tag_id,
+                      booking_date: data.booking_date,
+                      time_slot: data.time_slot,
+                    }
+                  ]);
+
+                if (error) throw error;
+
+                setIsNewBookingModalOpen(false);
+                queryClient.invalidateQueries(['bookings']);
+                toast({
+                  title: "Success",
+                  description: "Booking created successfully",
+                });
+              } catch (error) {
+                console.error('Error creating booking:', error);
+                toast({
+                  variant: "destructive",
+                  title: "Error",
+                  description: "Failed to create booking",
+                });
+              }
+            }}
+            selectedDate=""
+            timeSlot=""
+            maxPeople={100}
+          />
         </div>
       </main>
     </div>

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { Clipboard } from 'lucide-react';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -99,7 +100,20 @@ const BookingModal = ({
     <Dialog open={isOpen} onOpenChange={() => onClose()}>
       <DialogContent className="sm:max-w-[425px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>New Booking for {selectedDate} at {timeSlot}</DialogTitle>
+          <DialogTitle className="flex justify-between items-center">
+            <span>New Booking {selectedDate && timeSlot ? `for ${selectedDate} at ${timeSlot}` : ''}</span>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                console.log('Insert from clipboard clicked');
+              }}
+              className="flex items-center gap-2"
+            >
+              <Clipboard className="w-4 h-4" />
+              Insert from Clipboard
+            </Button>
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
           <div>
