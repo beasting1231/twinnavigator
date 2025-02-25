@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -78,7 +77,6 @@ const BookingModal = ({
   const [date, setDate] = React.useState<Date | undefined>(
     selectedDate ? new Date(selectedDate) : undefined
   );
-  const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
   
   const { 
     register, 
@@ -117,7 +115,6 @@ const BookingModal = ({
     if (!isOpen) {
       reset();
       setDate(undefined);
-      setIsCalendarOpen(false);
     }
   }, [isOpen, reset]);
 
@@ -125,7 +122,6 @@ const BookingModal = ({
     if (newDate) {
       setDate(newDate);
       setValue('booking_date', format(newDate, 'yyyy-MM-dd'));
-      setIsCalendarOpen(false); // Close the calendar after selection
     }
   };
 
@@ -175,15 +171,15 @@ const BookingModal = ({
 
           <div>
             <Label>Date *</Label>
-            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+            <Popover>
               <PopoverTrigger asChild>
                 <Button
+                  type="button"
                   variant="outline"
                   className={cn(
                     "w-full justify-start text-left font-normal mt-1",
                     !date && "text-muted-foreground"
                   )}
-                  onClick={() => setIsCalendarOpen(true)}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {date ? format(date, "PPP") : <span>Pick a date</span>}
@@ -195,6 +191,7 @@ const BookingModal = ({
                   selected={date}
                   onSelect={handleDateSelect}
                   initialFocus
+                  disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                 />
               </PopoverContent>
             </Popover>
