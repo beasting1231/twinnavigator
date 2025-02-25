@@ -11,7 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Calendar } from "@/components/ui/calendar";
+import { DatePicker } from "@/components/ui/date-picker";
 import { format } from "date-fns";
 import {
   Select,
@@ -20,14 +20,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Clipboard, Calendar as CalendarIcon } from 'lucide-react';
+import { Clipboard } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
 const TIME_SLOTS = [
@@ -84,7 +79,6 @@ const BookingModal = ({
     formState: { errors },
     reset,
     setValue,
-    watch,
   } = useForm<BookingFormData>({
     resolver: zodResolver(bookingSchema),
     defaultValues: {
@@ -118,10 +112,13 @@ const BookingModal = ({
     }
   }, [isOpen, reset]);
 
-  const handleDateSelect = (newDate: Date | undefined) => {
+  const handleDateChange = (newDate: Date | undefined) => {
+    setDate(newDate);
     if (newDate) {
-      setDate(newDate);
-      setValue('booking_date', format(newDate, 'yyyy-MM-dd'));
+      setValue('booking_date', format(newDate, 'yyyy-MM-dd'), {
+        shouldValidate: true,
+        shouldDirty: true
+      });
     }
   };
 
@@ -171,30 +168,11 @@ const BookingModal = ({
 
           <div>
             <Label>Date *</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal mt-1",
-                    !date && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "PPP") : <span>Pick a date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={handleDateSelect}
-                  initialFocus
-                  disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                />
-              </PopoverContent>
-            </Popover>
+            <DatePicker
+              date={date}
+              onDateChange={handleDateChange}
+              className="mt-1"
+            />
             {errors.booking_date && (
               <p className="text-sm text-red-500 mt-1">{errors.booking_date.message}</p>
             )}
