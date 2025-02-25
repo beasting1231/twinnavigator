@@ -7,11 +7,13 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 const DailyPlan = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [isNewBookingModalOpen, setIsNewBookingModalOpen] = useState(false);
   const queryClient = useQueryClient();
+  const { profile } = useAuth();
 
   useEffect(() => {
     // Find and remove any existing viewport meta tag
@@ -54,23 +56,22 @@ const DailyPlan = () => {
               try {
                 const { error } = await supabase
                   .from('bookings')
-                  .insert([
-                    {
-                      name: data.name,
-                      pickup_location: data.pickup_location,
-                      number_of_people: data.number_of_people,
-                      phone: data.phone,
-                      email: data.email,
-                      tag_id: data.tag_id,
-                      booking_date: data.booking_date,
-                      time_slot: data.time_slot,
-                    }
-                  ]);
+                  .insert({
+                    name: data.name,
+                    pickup_location: data.pickup_location,
+                    number_of_people: data.number_of_people,
+                    phone: data.phone,
+                    email: data.email,
+                    tag_id: data.tag_id,
+                    booking_date: data.booking_date,
+                    time_slot: data.time_slot,
+                    pilot_id: profile?.id,
+                  });
 
                 if (error) throw error;
 
                 setIsNewBookingModalOpen(false);
-                queryClient.invalidateQueries(['bookings']);
+                queryClient.invalidateQueries({ queryKey: ['bookings'] });
                 toast({
                   title: "Success",
                   description: "Booking created successfully",

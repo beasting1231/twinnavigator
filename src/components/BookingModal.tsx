@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,6 +12,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
 import {
   Select,
   SelectContent,
@@ -18,9 +21,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Clipboard } from 'lucide-react';
+import { Clipboard, Calendar as CalendarIcon } from 'lucide-react';
+import { cn } from "@/lib/utils";
+
+const TIME_SLOTS = [
+  "09:00", "10:00", "11:00", "12:00", "13:00", 
+  "14:00", "15:00", "16:00", "17:00"
+];
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -39,8 +53,8 @@ export interface BookingFormData {
   phone?: string;
   email?: string;
   tag_id?: string;
-  booking_date?: string;
-  time_slot?: string;
+  booking_date: string;
+  time_slot: string;
 }
 
 const bookingSchema = z.object({
@@ -50,6 +64,8 @@ const bookingSchema = z.object({
   phone: z.string().optional(),
   email: z.string().email().optional().or(z.literal("")),
   tag_id: z.string().optional(),
+  booking_date: z.string().min(1, "Date is required"),
+  time_slot: z.string().min(1, "Time slot is required"),
 });
 
 const BookingModal = ({ 
@@ -66,10 +82,13 @@ const BookingModal = ({
     formState: { errors },
     reset,
     setValue,
+    watch,
   } = useForm<BookingFormData>({
     resolver: zodResolver(bookingSchema),
     defaultValues: {
       number_of_people: 1,
+      booking_date: selectedDate,
+      time_slot: timeSlot,
     }
   });
 
@@ -96,12 +115,14 @@ const BookingModal = ({
     }
   }, [isOpen, reset]);
 
+  const watchedDate = watch("booking_date");
+
   return (
     <Dialog open={isOpen} onOpenChange={() => onClose()}>
       <DialogContent className="sm:max-w-[425px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex justify-between items-center">
-            <span>New Booking {selectedDate && timeSlot ? `for ${selectedDate} at ${timeSlot}` : ''}</span>
+            <span>New Booking</span>
             <Button 
               variant="outline" 
               size="sm"
@@ -137,6 +158,54 @@ const BookingModal = ({
             />
             {errors.pickup_location && (
               <p className="text-sm text-red-500 mt-1">{errors.pickup_location.message}</p>
+            )}
+          </div>
+
+          <div>
+            <Label>Date *</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal mt-1",
+                    !watchedDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {watchedDate ? format(new Date(watchedDate), "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={watchedDate ? new Date(watchedDate) : undefined}
+                  onSelect={(date) => setValue('booking_date', date ? format(date, 'yyyy-MM-dd') : '')}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            {errors.booking_date && (
+              <p className="text-sm text-red-500 mt-1">{errors.booking_date.message}</p>
+            )}
+          </div>
+
+          <div>
+            <Label>Time *</Label>
+            <Select onValueChange={(value) => setValue('time_slot', value)}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select a time" />
+              </SelectTrigger>
+              <SelectContent>
+                {TIME_SLOTS.map((slot) => (
+                  <SelectItem key={slot} value={slot}>
+                    {slot}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.time_slot && (
+              <p className="text-sm text-red-500 mt-1">{errors.time_slot.message}</p>
             )}
           </div>
 
