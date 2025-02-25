@@ -1,4 +1,3 @@
-
 import React, { useEffect, useCallback } from 'react';
 import { format, addDays, startOfWeek } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
@@ -294,11 +293,7 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
   return (
     <div className="mt-8 overflow-x-auto pb-4">
       <div className="min-w-[1000px]">
-        <div className="grid grid-cols-[120px_1fr] gap-4">
-          <div className="font-semibold mb-2">
-            Take-off Time
-          </div>
-          
+        <div className="space-y-4">
           <div className="grid grid-cols-7 gap-4">
             {DAYS.map((day) => (
               <div 
@@ -312,40 +307,34 @@ const WeeklyGrid = ({ selectedDate }: WeeklyGridProps) => {
           </div>
 
           {TIMES.map((time) => (
-            <React.Fragment key={time}>
-              <div className="py-2 font-medium text-muted-foreground">
-                {time}
-              </div>
-
-              <div className="grid grid-cols-7 gap-4">
-                {DAYS.map((day) => {
-                  const isAvailable = availabilities.some(
-                    (a) => a.day === day.date && a.time_slot === time && a.pilot_id === user?.id
-                  );
-                  
-                  return (
-                    <div 
-                      key={`${day.date}-${time}`} 
-                      className="min-h-[40px]"
-                      onClick={() => isPilot && handleAvailabilityToggle(day.date, time)}
-                    >
-                      {isPilot && (
-                        <div 
-                          className={cn(
-                            "rounded-lg p-2 text-sm font-medium text-center cursor-pointer transition-colors",
-                            isAvailable 
-                              ? "bg-green-500/20 text-green-700 hover:bg-green-500/30" 
-                              : "bg-red-500/10 text-red-700 hover:bg-red-500/20"
-                          )}
-                        >
-                          {time}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </React.Fragment>
+            <div key={time} className="grid grid-cols-7 gap-4">
+              {DAYS.map((day) => {
+                const isAvailable = availabilities.some(
+                  (a) => a.day === day.date && a.time_slot === time && a.pilot_id === user?.id
+                );
+                
+                return (
+                  <div 
+                    key={`${day.date}-${time}`} 
+                    className="min-h-[40px]"
+                    onClick={() => isPilot && handleAvailabilityToggle(day.date, time)}
+                  >
+                    {isPilot && (
+                      <div 
+                        className={cn(
+                          "rounded-lg p-2 text-sm font-medium text-center cursor-pointer transition-colors",
+                          isAvailable 
+                            ? "bg-green-500/20 text-green-700 hover:bg-green-500/30" 
+                            : "bg-red-500/10 text-red-700 hover:bg-red-500/20"
+                        )}
+                      >
+                        {time}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           ))}
         </div>
 
