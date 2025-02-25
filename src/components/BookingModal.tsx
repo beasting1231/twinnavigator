@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -32,8 +31,7 @@ import { Clipboard, Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
 const TIME_SLOTS = [
-  "09:00", "10:00", "11:00", "12:00", "13:00", 
-  "14:00", "15:00", "16:00", "17:00"
+  "7:30", "8:30", "9:45", "11:00", "12:30", "14:00", "15:30", "16:45"
 ];
 
 interface BookingModalProps {
