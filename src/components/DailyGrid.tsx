@@ -492,11 +492,6 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
                           width: '100%'
                         }}
                         onClick={() => {
-                          console.log('Clicked booking:', {
-                            booking: slot.booking,
-                            hasBookingDate: 'booking_date' in slot.booking,
-                            bookingDate: slot.booking.booking_date
-                          });
                           setSelectedBooking(slot.booking);
                         }}
                       >
@@ -510,16 +505,27 @@ const DailyGrid = ({ selectedDate }: DailyGridProps) => {
                           </div>
                         </div>
                         {slot.booking.pilot_assignments && slot.booking.pilot_assignments.length > 0 && (
-                          <div className="w-[90%] mx-auto mt-1.5">
-                            <div className="grid grid-cols-3 gap-1">
-                              {slot.booking.pilot_assignments.map((pilot) => (
-                                <div 
-                                  key={pilot.pilot_id} 
-                                  className="bg-black/30 px-2 py-1 rounded text-[10px] font-medium text-white truncate text-center"
-                                >
-                                  {pilot.profiles.username || 'Unknown Pilot'}
-                                </div>
-                              ))}
+                          <div className="w-full mt-1.5">
+                            <div 
+                              className="grid gap-1"
+                              style={{
+                                gridTemplateColumns: `repeat(${slot.booking.number_of_people}, 1fr)`
+                              }}
+                            >
+                              {Array.from({ length: slot.booking.number_of_people }).map((_, pilotIndex) => {
+                                const pilotAssignment = slot.booking.pilot_assignments?.[pilotIndex];
+                                return (
+                                  <div 
+                                    key={pilotIndex}
+                                    className={cn(
+                                      "px-2 py-1 rounded text-[10px] font-medium text-white truncate text-center",
+                                      pilotAssignment ? "bg-black/30" : "bg-black/10"
+                                    )}
+                                  >
+                                    {pilotAssignment?.profiles.username || '-'}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         )}
